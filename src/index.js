@@ -10,7 +10,18 @@ const createStream = async;
 const createDispatch = action$ => action => action$.next(action);
 const initialState = {};
 const handlers = {
-  flip: (state, action) => R.evolve({ [action.payload.id]: R.evolve({ flip: R.not }) }, state),
+  flip: (state, action) => {
+    const { payload: { id, value } } = action;
+    return R.evolve(
+      {
+        [id]: R.evolve({
+          flip: R.when(R.isNil(value), R.not, R.always(value)),
+          flippedTime: '...',
+        }),
+      },
+      state,
+    );
+  },
 };
 const createReducer = (initialState, handlers) => (state = initialState, action) =>
   R.propOr(identity, action.type, handlers)(state, action);
