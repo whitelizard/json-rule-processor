@@ -9,17 +9,17 @@ import { map, scan } from 'most';
 const createStream = async;
 const createDispatch = action$ => action => action$.next(action);
 const initialState = {};
+const evolveId = (id, state, update) => R.evolve({ [id]: update });
 const handlers = {
   flip: (state, action) => {
     const { payload: { id, value } } = action;
-    return R.evolve(
-      {
-        [id]: R.evolve({
-          flip: R.when(R.isNil(value), R.not, R.always(value)),
-          flippedTime: '...',
-        }),
-      },
+    return evolveId(
+      id,
       state,
+      R.evolve({
+        flip: R.when(R.isNil(value), R.not, R.always(value)),
+        flippedTime: '...',
+      }),
     );
   },
 };
