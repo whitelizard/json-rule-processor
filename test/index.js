@@ -12,12 +12,11 @@ test('BASIC', async t => {
 const rules = client => [
   {
     rid: 111,
-    owner: 'user1',
     actuator: 'backend',
     ttl: Date.now() / 1000 + 10,
     active: true,
     cooldown: 30, // secs
-    condition: ['if', true],
+    // condition: ['if', true],
     // triggers: { channels: ['data/default'] },
     triggers: [{ msg: ['subscribe', 'data/default'] }, ['cron', '* * * * * *']],
     asyncs: [{ asset: ['rpc', 'conf/readAsset', { rids: ['robot1'] }] }],
@@ -40,28 +39,24 @@ const rules = client => [
       ['=', ['var', 'asset[0]extra.model'], 'b7'],
       ['<', ['var', 'weather.temp'], -20],
     ],
-    actions: {
-      apiCalls: [
-        // [ RPC-id, args ]
-        ['mirror/look', { value: ['%get%', 'asset[0]extra.height'] }],
-        ['service/three', ['%jl%', { var: 'msg.ts' }]],
-      ],
-      // publish: [['CH', [1, 2, 3]]],
-      // timers: {
-      //   X: [10, 60],
-      // }
-      // intervals:
-    },
-    resetCondition: {
-      '<': [{ var: 'msg.pl.0' }, 230],
-    },
-    resetActions: {
-      apiCalls: [['un/fire', ['%jl%', { var: 'msg.pl.0' }]]],
-    },
+    actions: [['rpc', 'service/three', { time: ['var', 'msg.ts'] }]],
+    // DDD: {
+    //   apiCalls: [
+    //     // [ RPC-id, args ]
+    //     ['mirror/look', { value: ['%get%', 'asset[0]extra.height'] }],
+    //     ['service/three', ['%jl%', { var: 'msg.ts' }]],
+    //   ],
+    //   // publish: [['CH', [1, 2, 3]]],
+    //   // timers: {
+    //   //   X: [10, 60],
+    //   // }
+    //   // intervals:
+    // },
+    resetCondition: ['<', ['var', 'msg.pl.0'], 230],
+    resetActions: [['rpc', 'un/fire', { arg: ['var', 'msg.pl.0'] }]],
   },
   {
     rid: 123,
-    owner: 'user1',
     actuator: 'backend',
     ttl: Date.now() / 1000 + 10,
     active: true,
@@ -111,7 +106,6 @@ const rules = client => [
   },
   {
     ...baseRule(client),
-    owner: 'super',
     triggers: {
       channels: ['data/jepv16uc-5pywzxsbmlm'],
     },
@@ -369,27 +363,15 @@ const rules = client => [
   },
 ];
 
-const provideOnce = rpcId =>
-  new Promise(resolve => {
-    // console.log('providing:', rpcId);
-    c.rpc.provide(rpcId, (args, response) => {
-      // console.log(rpcId, 'requested. Answering');
-      response.send(args);
-      c.rpc.unprovide(rpcId);
-      resolve(args);
-    });
-  });
-
-const subscribeBusP = ch =>
-  new Promise(resolve => {
-    c.event.subscribe(ch, tiipMsg => {
-      resolve(tiipMsg);
-    });
-  });
-
 const aTimestamp = 1521663819160 / 1000;
 
 test('First', async () => {
-  const ruleProcessor = createRuleProcessor({ transforms: {} });
-  ruleProcessor.giveRules(rules);
+  // const ruleProcessor = createRuleProcessor({ transforms: {} });
+  loadRules(rules, {}, 'rid', (ml, vars, key) => {
+    ml.subscribe = ch =>
+      client.sub(ch, msg => {
+        if (key) vars[key] = msg;
+        processRule();
+      });
+  });
 });

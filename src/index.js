@@ -23,6 +23,12 @@ export const mlParser = ({ envExtra, keepJsEval = false }, vars) => {
     Math,
     setInterval,
     setTimeout,
+    parseInt,
+    parseFloat,
+    isNaN,
+    Set,
+    Map,
+    RegExp,
     // fetch,
     log: console.log,
     ...envExtra,
@@ -82,20 +88,24 @@ const initialRuleState = {
   vars: {},
 };
 
-export const loadRules = (newRules, envExtra, idKey = 'id') => {
-  newRules.forEach(ruleConf => {
-    const { [idKey]: id, triggers, actuator = 'backend', active } = ruleConf;
-    if (actuator !== 'backend') return;
-    ruleStore[id] = { ...initialRuleState, ...(ruleStore[id] || {}), conf: ruleConf, active };
-    const { vars } = ruleStore[id];
-    const ml = mlParser({ envExtra }, vars);
-    triggers.forEach(trigger => {
+export const loadRule = (ruleConf, envExtra, idKey = 'id', mlTriggerHook) => {
+  const { [idKey]: id, triggers, actuator = 'backend', active } = ruleConf;
+  if (actuator !== 'backend') return;
+  ruleStore[id] = { ...initialRuleState, ...(ruleStore[id] || {}), conf: ruleConf, active };
+  const { vars } = ruleStore[id];
+  const ml = mlParser({ envExtra }, vars);
+  triggers.forEach(trigger => {
+    if (typeof trigger === 'object') {
+      trigger.entries().forEach(([key, val]) => {
+        if (mlTriggerHook) mlTriggerHook(ml, vars, key);
+        ml.eval(val);
+      });
+    } else {
+      if (mlTriggerHook) mlTriggerHook(ml, vars);
       ml.eval(trigger);
-    });
+    }
   });
 };
-
-export const createRuleProcessor = ({}) => {};
 
 const checkRule = (rule, ruleState) => {
   const { active, lastFired, flipped } = ruleState;
@@ -109,62 +119,26 @@ const checkRule = (rule, ruleState) => {
   return undefined; // continue
 };
 
-const preFetch = (fetcher, preFetches) =>
-  R.compose(
-    R.reduce((acc, [id, call]) => ({ ...acc, [id]: fetcher(call) }), {}),
-    R.toPairs,
-  )(preFetches);
+const processRule = (id, ml, vars) => {
+  const newFinalState = checkRule(ruleConf, ruleState);
+  if (newFinalState) return newFinalState; // else continue
+  const { asyncs, process } = rule;
+  // const fetched = preFetch(fetcher, preFetches);
 
-export const createRule = ({ rule }) => {
-  const ruleComponent = {
-    state: {
-      active: false,
-      flipped: false,
-      lastFired: 0,
-    },
-  };
-  const vars = {};
-  const mLisp = miniMAL({
-    Math,
-    Date,
-    _,
-    // getVar: k => _.get(vars, k),
-    // setVar: (k, v) => _.set(vars, k, v),
-    var: (k, v) => (v === undefined ? _.get : _.set)(vars, k, v),
-    subscribe: (ch, prop) => client.subscribe(ch, onMsg(prop)),
-    // var: (k, v) => (v === undefined ? _.get(vars, k) : _.set(vars, k, v)),
-    ...ctx,
-  });
-  const processRule = ({
-    id,
-    ctx,
-    rule,
-    ruleState,
-    fetcher,
-    transform,
-    conditionTransform,
-    runActions,
-  }) => {
-    const newFinalState = checkRule(rule, ruleState);
-    if (newFinalState) return newFinalState; // else continue
-    const { preFetches, process } = rule;
-    // const fetched = preFetch(fetcher, preFetches);
+  const vars = Array.isArray(process) ? 1 : ml.eval(rule.process, ctx);
 
-    const vars = Array.isArray(process) ? 1 : transform(rule.process, ctx);
-
-    if (flipped && resetCondition) {
-      const conditionsMet = conditionTransform(resetCondition, context);
-      if (conditionsMet) {
-        // setFlipped(rule, false);
-        return runActions(rule, context, true);
-      }
-      return undefined;
-    }
-    if (flipped || !cooledDown) return undefined;
-    const conditionsMet = conditionTransform(rule.condition, context);
+  if (flipped && resetCondition) {
+    const conditionsMet = conditionTransform(resetCondition, context);
     if (conditionsMet) {
-      setFlipped(rule, true);
-      return runActions(rule, context);
+      // setFlipped(rule, false);
+      return runActions(rule, context, true);
     }
-  };
+    return undefined;
+  }
+  if (flipped || !cooledDown) return undefined;
+  const conditionsMet = conditionTransform(rule.condition, context);
+  if (conditionsMet) {
+    setFlipped(rule, true);
+    return runActions(rule, context);
+  }
 };
