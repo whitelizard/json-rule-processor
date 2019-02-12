@@ -5,7 +5,7 @@ import _ from 'lodash';
 import * as R from 'ramda';
 // import { createStore } from 'redux';
 
-export const mlParser = ({ envExtra, keepJsEval = false }, vars) => {
+export const mlParser = ({ envExtra = {}, keepJsEval = false }, vars) => {
   const parser = miniMAL({
     undefined,
     typeof: a => typeof a, // renaming of miniMAL's 'type'
@@ -88,8 +88,8 @@ const initialRuleState = {
   vars: {},
 };
 
-export const loadRule = (ruleConf, envExtra, idKey = 'id', mlTriggerHook) => {
-  const { [idKey]: id, triggers, actuator = 'backend', active } = ruleConf;
+export const loadRule = (ruleConf, envExtra, idKey = 'id', triggerHook) => {
+  const { [idKey]: id, triggers = [], actuator = 'backend', active } = ruleConf;
   if (actuator !== 'backend') return;
   ruleStore[id] = { ...initialRuleState, ...(ruleStore[id] || {}), conf: ruleConf, active };
   const { vars } = ruleStore[id];
@@ -97,31 +97,34 @@ export const loadRule = (ruleConf, envExtra, idKey = 'id', mlTriggerHook) => {
   triggers.forEach(trigger => {
     if (typeof trigger === 'object') {
       trigger.entries().forEach(([key, val]) => {
-        if (mlTriggerHook) mlTriggerHook(ml, vars, key);
+        if (triggerHook) triggerHook(ml, vars, key);
         ml.eval(val);
       });
     } else {
-      if (mlTriggerHook) mlTriggerHook(ml, vars);
+      if (triggerHook) triggerHook(ml, vars);
       ml.eval(trigger);
     }
   });
 };
 
-const checkRule = (rule, ruleState) => {
-  const { active, lastFired, flipped } = ruleState;
-  if (!active) return ruleState;
+const checkRule = (ruleConf, active, lastFired, flipped) => {
+  if (!active) return {};
   const now = Date.now();
-  if (rule.ttl && rule.ttl < now) return { ...ruleState, active: false };
+  const { cooldown = 0, resetCondition, ttl = Infinity } = ruleConf;
+  if (ttl && ttl < now) return { active: false };
 
-  const { cooldown, resetCondition } = rule;
   const cooledDown = now >= lastFired + cooldown;
-  if (flipped && !resetCondition && !cooledDown) return ruleState;
+  if (flipped && !resetCondition && !cooledDown) return {};
   return undefined; // continue
 };
 
 const processRule = (id, ml, vars) => {
-  const newFinalState = checkRule(ruleConf, ruleState);
-  if (newFinalState) return newFinalState; // else continue
+  const { conf, active, lastFired, flipped } = ruleStore[id];
+  const newState = checkRule(conf, active, lastFired, flipped);
+  if (newState) {
+    ruleStore[id] = { ...(ruleStore[id] || {}), ...newFinalState };
+    return;
+  } // else continue
   const { asyncs, process } = rule;
   // const fetched = preFetch(fetcher, preFetches);
 
