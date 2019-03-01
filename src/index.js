@@ -1,45 +1,10 @@
 import 'airbnb-js-shims';
 // import getTransformer, { builtInTransforms } from 'json-transformer-js';
 import miniMAL from 'minimal-lisp';
-import _ from 'lodash';
+import _ from 'lodash/fp';
 import * as R from 'ramda';
 // import { createStore } from 'redux';
-
-export const minimalLispParser = ({ envExtra = {}, keepJsEval = false }, vars) => {
-  const parser = miniMAL({
-    undefined,
-    typeof: a => typeof a, // renaming of miniMAL's 'type'
-    '>': (a, b) => a > b,
-    '<=': (a, b) => a <= b,
-    '>=': (a, b) => a >= b,
-    '===': (a, b) => a === b,
-    '!==': (a, b) => a !== b,
-    '%': (a, b) => a % b,
-    var: (path, x) => (x === undefined ? _.get(vars, path) : _.get(_.set(vars, path, x))),
-    Array,
-    Object,
-    String,
-    Date,
-    Math,
-    setInterval,
-    setTimeout,
-    parseInt,
-    parseFloat,
-    isNaN,
-    Set,
-    Map,
-    RegExp,
-    // fetch,
-    log: console.log,
-    ...envExtra,
-  });
-  if (!keepJsEval) {
-    parser.js = () => {
-      throw new Error('Permission denied');
-    };
-  }
-  return parser;
-};
+import { minimalLispParser } from './minimal-lisp-parser';
 
 // TODO: Need a state manager! most.js?
 // TODO: State machine for each rule?
@@ -127,7 +92,7 @@ const handleAsyncs = async (parser, result, asyncConf = []) => {
   const [nextAsync, ...rest] = asyncConf;
   if (typeof nextAsync === 'object' && !Array.isArray(nextAsync)) {
     const keyPromisePairs = Object.entries(nextAsync);
-    const results = await Promise.all(keyPromisePairs.map(([_, val]) => parser.eval(val)));
+    const results = await Promise.all(keyPromisePairs.map(([x, val]) => parser.eval(val)));
     results.forEach((data, ix) => {
       result[keyPromisePairs[ix][0]] = data;
     });
@@ -137,10 +102,11 @@ const handleAsyncs = async (parser, result, asyncConf = []) => {
   }
 };
 
-export const processRule = (id, parser, vars) => {
+export const processRule = async (id, vars) => {
   const { conf, flipped } = ruleStore[id];
   if (checkRule(id)) return;
   const { asyncs, process } = conf;
+  const parser = minimalLispParser({ envExtra }, vars);
   await handleAsyncs(parser, vars, asyncs);
   // const fetched = preFetch(fetcher, preFetches);
 

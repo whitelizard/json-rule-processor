@@ -21,6 +21,7 @@ const rules = client => [
     triggers: [{ msg: ['subscribe', 'data/default'] }, ['cron', '* * * * * *']],
     asyncs: [{ asset: ['rpc', 'conf/readAsset', { rids: ['robot1'] }] }],
     process: [
+      ['compose', ['get', 'pl[0]'], ['propOr', {}, 'msg']],
       ['var', 'conf', ['read', '{ "test": [1,2,3] }']],
       { weather: ['rpc', 'weather/read', { pos: [58.2, 15.9] }] },
       { lastTemp: ['var', 'temperature[0].pl[0]'] },
@@ -367,11 +368,12 @@ const aTimestamp = 1521663819160 / 1000;
 
 test('First', async () => {
   // const ruleProcessor = createRuleProcessor({ transforms: {} });
-  loadRules(rules, {}, 'rid', (ml, vars, key) => {
-    ml.subscribe = ch =>
+  const ruleConf = rules[0];
+  loadRule(ruleConf, {}, 'rid', (parser, vars, triggerKey) => {
+    parser.subscribe = ch =>
       client.sub(ch, msg => {
-        if (key) vars[key] = msg;
-        processRule();
+        // if (triggerKey) vars[triggerKey] = msg;
+        processRule(ruleConf.rid, triggerKey ? { [triggerKey]: msg } : {});
       });
   });
 });
