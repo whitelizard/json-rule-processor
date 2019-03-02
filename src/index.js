@@ -50,7 +50,7 @@ const ruleStore = {
 const initialRuleState = {
   active: false,
   flipped: false,
-  // lastFired
+  lastFired: addYears(-100)(new Date()),
   // ttl
   // onExpired
 };
@@ -84,39 +84,54 @@ export const unloadRule = id => {
 
 const checkRule = id => {
   const { active, lastFired, flipped, conf, ttl, onExpired } = ruleStore[id];
-  if (!active) return true;
+  if (!active) return [true];
   const now = new Date();
   const { cooldown = 0, resetCondition } = conf;
+  // console.log('Checking 1:', cooldown, resetCondition);
   if (isBefore(now)(ttl)) {
     // rule has expired
     ruleStore[id] = { ...ruleStore[id], active: false };
     if (onExpired) onExpired(id);
-    return true;
+    return [true];
   }
-  const cooledDown = isBefore(addSeconds(cooldown)(lastFired))(now);
-  if (flipped && !resetCondition && !cooledDown) return true;
-  return false; // continue
+  const cooledDown = isBefore(now)(addSeconds(cooldown)(lastFired));
+  // console.log('Checking 2:', cooledDown, lastFired);
+  if (!resetCondition) {
+    if (flipped && !cooledDown) return [true]; // no point continuing
+    if (flipped && cooledDown) {
+      ruleStore[id] = { ...ruleStore[id], flipped: false };
+    }
+  }
+  return [false, cooledDown]; // continue
 };
 
 export const runRule = async (id, vars = {}, parserOptions = {}) => {
-  const { conf, flipped } = ruleStore[id];
-  if (checkRule(id)) return;
-  const { process } = conf;
+  const [done, cooledDown] = checkRule(id);
+  if (done) return undefined;
+  const {
+    conf: { process, resetCondition, condition, resetActions, actions },
+    flipped,
+  } = ruleStore[id];
   const parser = functionalParserWithVars(vars, parserOptions);
   if (process) await asyncBlockEvaluator(parser, process);
+  // console.log('After process:', vars, flipped, resetCondition, condition);
+  if (flipped && resetCondition) {
+    const conditionsMet = parser.evalWithLog(resetCondition);
+    if (conditionsMet) {
+      ruleStore[id] = { ...ruleStore[id], flipped: false };
+      return asyncBlockEvaluator(parser, resetActions);
+    }
+    return undefined;
+  }
+  // console.log('Last check:', flipped, cooledDown);
+  if (flipped || !cooledDown) return undefined;
 
-  // if (flipped && resetCondition) {
-  //   const conditionsMet = conditionTransform(resetCondition, context);
-  //   if (conditionsMet) {
-  //     // setFlipped(rule, false);
-  //     return runActions(rule, context, true);
-  //   }
-  //   return undefined;
-  // }
-  // if (flipped || !cooledDown) return undefined;
-  // const conditionsMet = conditionTransform(rule.condition, context);
-  // if (conditionsMet) {
-  //   setFlipped(rule, true);
-  //   return runActions(rule, context);
-  // }
+  // console.log('Will run condition:', condition, actions);
+  const conditionsMet = parser.evalWithLog(condition);
+  // console.log('conditionsMet:', conditionsMet);
+  if (conditionsMet) {
+    ruleStore[id] = { ...ruleStore[id], flipped: true };
+    return asyncBlockEvaluator(parser, actions);
+  }
+  return undefined;
 };

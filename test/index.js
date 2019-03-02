@@ -411,10 +411,7 @@ test('patchParser effects & arguments', async t => {
     id: 11,
     active: true,
     triggers: [{ msg: ['subscribe', ['`', 'data/default']] }],
-    // process: [],
-    // condition: ['if', true],
   };
-  // const ruleProcessor = createRuleProcessor({ transforms: {} });
   const client = testClient({ ts: String(Date.now() / 1000), pl: [3] });
   let setDone;
   const done = new Promise(r => {
@@ -438,46 +435,43 @@ test('Should handle asyncs/promises in process', async t => {
   const ruleConf = {
     id: 11,
     active: true,
-    // condition: ['if', true],
-    // triggers: [{ msg: ['subscribe', ['`', 'data/default']] }],
-    process: [{ asset: ['rpc', ['`', 'getAsset']] }, { theAsset: ['var', ['`', 'asset']] }],
+    process: [{ asset: ['rpc', ['`', 'data']] }, { theAsset: ['var', ['`', 'asset']] }],
   };
-  // const ruleProcessor = createRuleProcessor({ transforms: {} });
-  // const client = testClient({ ts: String(Date.now() / 1000), pl: [3] });
   const vars = {};
   await loadRule(ruleConf);
   await runRule(11, vars, {
     envExtra: {
-      rpc: id => {
-        console.log('rpc:', id);
-        return new Promise(r => setTimeout(r(id), 100));
+      rpc: id => new Promise(r => setTimeout(r(id), 100)),
+    },
+  });
+  t.equals(vars.asset, 'data');
+  t.equals(vars.theAsset, 'data');
+});
+
+test('Should fire actions with data from process', async t => {
+  const ruleConf = {
+    id: 11,
+    active: true,
+    process: [{ data: ['rpc', 5] }],
+    condition: ['if', true, true],
+    actions: [['fire', 1], ['fire', ['var', ['`', 'data']]]],
+  };
+  const vars = {};
+  let result = 0;
+  let setDone;
+  const done = new Promise(r => {
+    setDone = r;
+  });
+  await loadRule(ruleConf);
+  await runRule(11, vars, {
+    envExtra: {
+      rpc: id => new Promise(r => setTimeout(r(id), 100)),
+      fire: value => {
+        result += Number(value);
+        if (result > 5) setDone();
       },
     },
   });
-  t.equals(vars.asset, 'getAsset');
-  t.equals(vars.theAsset, 'getAsset');
+  await done;
+  t.equals(result, 6);
 });
-
-// test('Should handle asyncs/promises in process', async t => {
-//   const ruleConf = {
-//     id: 11,
-//     active: true,
-//     condition: ['if', true],
-//     // triggers: [{ msg: ['subscribe', ['`', 'data/default']] }],
-//     process: [{ asset: ['rpc', ['`', 'getAsset']] }, { theAsset: ['var', ['`', 'asset']] }],
-//   };
-//   // const ruleProcessor = createRuleProcessor({ transforms: {} });
-//   // const client = testClient({ ts: String(Date.now() / 1000), pl: [3] });
-//   const vars = {};
-//   await loadRule(ruleConf);
-//   await runRule(11, vars, {
-//     envExtra: {
-//       rpc: id => {
-//         console.log('rpc:', id);
-//         return new Promise(r => setTimeout(r(id), 100));
-//       },
-//     },
-//   });
-//   t.equals(vars.asset, 'getAsset');
-//   t.equals(vars.theAsset, 'getAsset');
-// });
