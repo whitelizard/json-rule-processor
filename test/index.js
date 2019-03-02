@@ -1,26 +1,20 @@
 import test from 'blue-tape';
+import { addYears } from 'date-fns/fp';
+import { loadRule, processRule } from '../src/index';
+import { getOrSet } from '../src/minimal-lisp-parser';
 
-import { processRule } from '../src/index'; // eslint-disable-line
-
-test('BASIC', async t => {
-  const msg = { ts: String(Date.now() / 1000), pl: [3] };
-  processRule({
-    active: true,
-  });
-});
-
-const rules = client => [
+const rules = [
   {
     rid: 111,
     actuator: 'backend',
-    ttl: Date.now() / 1000 + 10,
+    ttl: addYears(100)(new Date()).toJSON(),
     active: true,
     cooldown: 30, // secs
     // condition: ['if', true],
     // triggers: { channels: ['data/default'] },
     triggers: [{ msg: ['subscribe', 'data/default'] }, ['cron', '* * * * * *']],
-    asyncs: [{ asset: ['rpc', 'conf/readAsset', { rids: ['robot1'] }] }],
     process: [
+      { asset: ['rpc', 'conf/readAsset', { rids: ['robot1'] }] },
       ['compose', ['get', 'pl[0]'], ['propOr', {}, 'msg']],
       ['var', 'conf', ['read', '{ "test": [1,2,3] }']],
       { weather: ['rpc', 'weather/read', { pos: [58.2, 15.9] }] },
@@ -79,13 +73,6 @@ const rules = client => [
         ],
       },
     ],
-    condition: {
-      and: [
-        { '>': [{ var: 'msg.pl.0' }, 260] },
-        { '===': [{ var: 'asset.0.extra.model' }, 'b7'] },
-        { '<': [{ var: 'weather.temp' }, -20] },
-      ],
-    },
     actions: {
       apiCalls: [
         // [ RPC-id, args ]
@@ -106,7 +93,6 @@ const rules = client => [
     },
   },
   {
-    ...baseRule(client),
     triggers: {
       channels: ['data/jepv16uc-5pywzxsbmlm'],
     },
@@ -250,7 +236,6 @@ const rules = client => [
     actuator: 'backend',
   },
   {
-    ...baseRule(client),
     cooldown: 0.2,
     triggers: { channels: ['data/cycles'] },
     externalData: { previous: ['data-history/read', { rid: 'data/utilization', limit: 1 }] },
@@ -364,16 +349,96 @@ const rules = client => [
   },
 ];
 
-const aTimestamp = 1521663819160 / 1000;
+// const aTimestamp = 1521663819160 / 1000;
+const testClient = msg => ({
+  sub: (_, cb) => {
+    setTimeout(() => cb(msg), 100);
+  },
+});
 
-test('First', async () => {
+test('Parser "var" should modify vars', async t => {
+  const vars = { test: 1 };
+  const myVar = getOrSet(vars);
+  myVar('test', 2);
+  t.equals(vars.test, 2);
+  t.equals(myVar('test'), 2);
+});
+
+test('No ID throws', async t => {
+  t.shouldFail(loadRule({}));
+});
+
+test('Custom ID key is accepted', async t => {
+  await loadRule({ rid: 11 }, { idKey: 'rid' });
+  t.ok(true); // didn't throw
+});
+
+test("Shouldn't load rule if not active", async t => {
+  await loadRule({ id: 11 });
+  t.shouldFail(processRule(11));
+});
+
+test('Handle ttl expired', async t => {
+  let expired = false;
+  const triggerVars = { triggersProcessed: false };
+  const vars = { processUnprocessed: true };
+  await loadRule(
+    {
+      id: 11,
+      active: true,
+      ttl: Date.now(),
+      triggers: [
+        ['var', ['`', 'triggersProcessed'], true],
+        ['log', ['var', ['`', 'triggersProcessed']]],
+      ],
+      process: [['var', ['`', 'processUnprocessed'], false]],
+    },
+    { onExpired: () => (expired = true), vars: triggerVars },
+  );
+  await processRule(11, { vars });
+  t.ok(expired);
+  t.ok(triggerVars.triggersProcessed);
+  t.ok(vars.processUnprocessed);
+});
+
+test('First', async t => {
+  const ruleConf = {
+    rid: 111,
+    actuator: 'backend',
+    ttl: addYears(100)(new Date()).toJSON(),
+    active: true,
+    cooldown: 30, // secs
+    // condition: ['if', true],
+    triggers: [{ msg: ['subscribe', ['`', 'data/default']] }],
+    process: [
+      // { asset: ['rpc', 'conf/readAsset', { rids: ['robot1'] }] },
+      ['compose', ['get', 'pl[0]'], ['var', ['`', 'msg']]],
+      ['var', 'conf', ['read', '{ "test": [1,2,3] }']],
+      // { weather: ['rpc', 'weather/read', { pos: [58.2, 15.9] }] },
+      { lastTemp: ['var', 'temperature[0].pl[0]'] },
+      { initTemp: ['var', 'asset[0].params.initTemperature'] },
+      {
+        normalizedPressure: [
+          '-',
+          ['var', 'msg.pl[1]'],
+          ['*', 0.003, ['-', ['var', 'lastTemp'], ['var', 'initTemp']]],
+        ],
+      },
+    ],
+  };
   // const ruleProcessor = createRuleProcessor({ transforms: {} });
-  const ruleConf = rules[0];
-  loadRule(ruleConf, {}, 'rid', (parser, vars, triggerKey) => {
-    parser.subscribe = ch =>
-      client.sub(ch, msg => {
-        // if (triggerKey) vars[triggerKey] = msg;
-        processRule(ruleConf.rid, triggerKey ? { [triggerKey]: msg } : {});
-      });
+  const client = testClient({ ts: String(Date.now() / 1000), pl: [3] });
+
+  await loadRule(ruleConf, {
+    idKey: 'rid',
+    patchParser: (parser, triggerKey) => {
+      parser.subscribe = ch =>
+        client.sub(ch, msg => {
+          console.log('client.sub:', msg);
+          // if (triggerKey) vars[triggerKey] = msg;
+          processRule(ruleConf.rid, { vars: triggerKey ? { [triggerKey]: msg } : {} });
+          t.ok(true);
+        });
+    },
   });
 });
