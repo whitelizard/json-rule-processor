@@ -1,6 +1,6 @@
 import test from 'blue-tape';
 import { addYears } from 'date-fns/fp';
-import { loadRule, processRule } from '../src/index';
+import { loadRule, runRule } from '../src/index';
 import { getOrSet } from '../src/minimal-lisp-parser';
 
 const rules = [
@@ -352,7 +352,7 @@ const rules = [
 // const aTimestamp = 1521663819160 / 1000;
 const testClient = msg => ({
   sub: (_, cb) => {
-    setTimeout(() => cb(msg), 100);
+    setTimeout(() => cb(msg), 10);
   },
 });
 
@@ -364,21 +364,21 @@ test('Parser "var" should modify vars', async t => {
   t.equals(myVar('test'), 2);
 });
 
-test('No ID throws', async t => {
+test('No ID should throw', async t => {
   t.shouldFail(loadRule({}));
 });
 
-test('Custom ID key is accepted', async t => {
+test('Custom ID key should be accepted', async t => {
   await loadRule({ rid: 11 }, { idKey: 'rid' });
   t.ok(true); // didn't throw
 });
 
 test("Shouldn't load rule if not active", async t => {
   await loadRule({ id: 11 });
-  t.shouldFail(processRule(11));
+  t.shouldFail(runRule(11));
 });
 
-test('Handle ttl expired', async t => {
+test('Should handle ttl expired', async t => {
   let expired = false;
   const triggerVars = { triggersProcessed: false };
   const vars = { processUnprocessed: true };
@@ -393,52 +393,91 @@ test('Handle ttl expired', async t => {
       ],
       process: [['var', ['`', 'processUnprocessed'], false]],
     },
-    { onExpired: () => (expired = true), vars: triggerVars },
+    {
+      onExpired: () => {
+        expired = true;
+      },
+      vars: triggerVars,
+    },
   );
-  await processRule(11, { vars });
+  await runRule(11, { vars });
   t.ok(expired);
   t.ok(triggerVars.triggersProcessed);
   t.ok(vars.processUnprocessed);
 });
 
-test('First', async t => {
+test('patchParser effects & arguments', async t => {
   const ruleConf = {
-    rid: 111,
-    actuator: 'backend',
-    ttl: addYears(100)(new Date()).toJSON(),
+    id: 11,
     active: true,
-    cooldown: 30, // secs
-    // condition: ['if', true],
     triggers: [{ msg: ['subscribe', ['`', 'data/default']] }],
-    process: [
-      // { asset: ['rpc', 'conf/readAsset', { rids: ['robot1'] }] },
-      ['compose', ['get', 'pl[0]'], ['var', ['`', 'msg']]],
-      ['var', 'conf', ['read', '{ "test": [1,2,3] }']],
-      // { weather: ['rpc', 'weather/read', { pos: [58.2, 15.9] }] },
-      { lastTemp: ['var', 'temperature[0].pl[0]'] },
-      { initTemp: ['var', 'asset[0].params.initTemperature'] },
-      {
-        normalizedPressure: [
-          '-',
-          ['var', 'msg.pl[1]'],
-          ['*', 0.003, ['-', ['var', 'lastTemp'], ['var', 'initTemp']]],
-        ],
-      },
-    ],
+    // process: [],
+    // condition: ['if', true],
   };
   // const ruleProcessor = createRuleProcessor({ transforms: {} });
   const client = testClient({ ts: String(Date.now() / 1000), pl: [3] });
-
+  let setDone;
+  const done = new Promise(r => {
+    setDone = r;
+  });
   await loadRule(ruleConf, {
-    idKey: 'rid',
     patchParser: (parser, triggerKey) => {
       parser.subscribe = ch =>
         client.sub(ch, msg => {
-          console.log('client.sub:', msg);
-          // if (triggerKey) vars[triggerKey] = msg;
-          processRule(ruleConf.rid, { vars: triggerKey ? { [triggerKey]: msg } : {} });
-          t.ok(true);
+          t.equals(msg.pl[0], 3);
+          t.equals(triggerKey, 'msg');
+          setDone();
+          // runRule(ruleConf.rid, triggerKey ? { [triggerKey]: msg } : {});
         });
     },
   });
+  await done;
 });
+
+test('Should handle asyncs/promises in process', async t => {
+  const ruleConf = {
+    id: 11,
+    active: true,
+    // condition: ['if', true],
+    // triggers: [{ msg: ['subscribe', ['`', 'data/default']] }],
+    process: [{ asset: ['rpc', ['`', 'getAsset']] }, { theAsset: ['var', ['`', 'asset']] }],
+  };
+  // const ruleProcessor = createRuleProcessor({ transforms: {} });
+  // const client = testClient({ ts: String(Date.now() / 1000), pl: [3] });
+  const vars = {};
+  await loadRule(ruleConf);
+  await runRule(11, vars, {
+    envExtra: {
+      rpc: id => {
+        console.log('rpc:', id);
+        return new Promise(r => setTimeout(r(id), 100));
+      },
+    },
+  });
+  t.equals(vars.asset, 'getAsset');
+  t.equals(vars.theAsset, 'getAsset');
+});
+
+// test('Should handle asyncs/promises in process', async t => {
+//   const ruleConf = {
+//     id: 11,
+//     active: true,
+//     condition: ['if', true],
+//     // triggers: [{ msg: ['subscribe', ['`', 'data/default']] }],
+//     process: [{ asset: ['rpc', ['`', 'getAsset']] }, { theAsset: ['var', ['`', 'asset']] }],
+//   };
+//   // const ruleProcessor = createRuleProcessor({ transforms: {} });
+//   // const client = testClient({ ts: String(Date.now() / 1000), pl: [3] });
+//   const vars = {};
+//   await loadRule(ruleConf);
+//   await runRule(11, vars, {
+//     envExtra: {
+//       rpc: id => {
+//         console.log('rpc:', id);
+//         return new Promise(r => setTimeout(r(id), 100));
+//       },
+//     },
+//   });
+//   t.equals(vars.asset, 'getAsset');
+//   t.equals(vars.theAsset, 'getAsset');
+// });

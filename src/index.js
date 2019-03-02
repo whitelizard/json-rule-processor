@@ -1,11 +1,11 @@
 import 'airbnb-js-shims';
 // import getTransformer, { builtInTransforms } from 'json-transformer-js';
-import miniMAL from 'minimal-lisp';
-import _ from 'lodash/fp';
+// import miniMAL from 'minimal-lisp';
+// import _ from 'lodash/fp';
 import { isBefore, addSeconds, addYears } from 'date-fns/fp';
 import * as R from 'ramda';
 // import { createStore } from 'redux';
-import { functionalParser, asyncBlockEvaluator } from './minimal-lisp-parser';
+import { functionalParserWithVars, asyncBlockEvaluator } from './minimal-lisp-parser';
 
 // TODO: Need a state manager! most.js?
 // TODO: State machine for each rule?
@@ -57,7 +57,7 @@ const initialRuleState = {
 
 export const loadRule = async (
   ruleConf,
-  { envExtra, idKey = 'id', patchParser, onExpired, vars = {} } = {},
+  { parserOptions = {}, idKey = 'id', patchParser, onExpired, vars = {} } = {},
 ) => {
   const { [idKey]: id, triggers, actuator = 'backend', active, ttl: ttlStr = null } = ruleConf;
   if (!id) throw new Error(`No ${idKey} found in rule`);
@@ -72,9 +72,14 @@ export const loadRule = async (
     onExpired,
   };
   // console.log('creating functionalParser:', vars);
-  const parser = functionalParser({ envExtra, vars });
-  if (triggers) await asyncBlockEvaluator(parser, patchParser)(triggers);
+  const parser = functionalParserWithVars(vars, parserOptions);
+  if (triggers) await asyncBlockEvaluator(parser, triggers, patchParser);
   else console.warn('Rule has no triggers:', id);
+};
+
+export const unloadRule = id => {
+  // TODO: ?????????????????????????????????????
+  // ruleStore = R.dissoc(id);
 };
 
 const checkRule = id => {
@@ -93,12 +98,12 @@ const checkRule = id => {
   return false; // continue
 };
 
-export const processRule = async (id, parserOptions = {}) => {
+export const runRule = async (id, vars = {}, parserOptions = {}) => {
   const { conf, flipped } = ruleStore[id];
   if (checkRule(id)) return;
   const { process } = conf;
-  const parser = functionalParser(parserOptions);
-  if (process) await asyncBlockEvaluator(parser)(process);
+  const parser = functionalParserWithVars(vars, parserOptions);
+  if (process) await asyncBlockEvaluator(parser, process);
 
   // if (flipped && resetCondition) {
   //   const conditionsMet = conditionTransform(resetCondition, context);
