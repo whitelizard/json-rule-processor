@@ -9,6 +9,11 @@ const testClient = msg => ({
     setTimeout(() => cb(msg), 10);
   },
 });
+let idCounter = 0;
+const getId = () => {
+  idCounter += 1;
+  return idCounter;
+};
 
 test('Parser "var" should modify vars', async t => {
   const vars = { test: 1 };
@@ -23,22 +28,24 @@ test('No ID should throw', async t => {
 });
 
 test('Custom ID key should be accepted', async t => {
-  await loadRule({ rid: 11 }, { idKey: 'rid' });
+  await loadRule({ rid: getId() }, { idKey: 'rid' });
   t.ok(true); // didn't throw
 });
 
 test("Shouldn't load rule if not active", async t => {
-  await loadRule({ id: 11 });
-  t.shouldFail(runRule(11));
+  const id = getId();
+  await loadRule({ id });
+  t.shouldFail(runRule(id));
 });
 
 test('Should handle ttl expired', async t => {
+  const id = getId();
   let expired = false;
   const triggerVars = { triggersProcessed: false };
   const vars = { processUnprocessed: true };
   await loadRule(
     {
-      id: 11,
+      id,
       active: true,
       ttl: Date.now(),
       triggers: [
@@ -54,15 +61,16 @@ test('Should handle ttl expired', async t => {
       vars: triggerVars,
     },
   );
-  await runRule(11, { vars });
+  await runRule(id, { vars });
   t.ok(expired);
   t.ok(triggerVars.triggersProcessed);
   t.ok(vars.processUnprocessed);
 });
 
 test('patchParser effects & arguments', async t => {
+  const id = getId();
   const ruleConf = {
-    id: 11,
+    id,
     active: true,
     triggers: [{ msg: ['subscribe', ['`', 'data/default']] }],
   };
@@ -86,16 +94,17 @@ test('patchParser effects & arguments', async t => {
 });
 
 test('Should handle asyncs/promises in process', async t => {
+  const id = getId();
   const ruleConf = {
-    id: 11,
+    id,
     active: true,
     process: [{ asset: ['rpc', ['`', 'data']] }, { theAsset: ['var', ['`', 'asset']] }],
   };
   const vars = {};
   await loadRule(ruleConf);
-  await runRule(11, vars, {
+  await runRule(id, vars, {
     envExtra: {
-      rpc: id => new Promise(r => setTimeout(r(id), 100)),
+      rpc: name => new Promise(r => setTimeout(r(name), 100)),
     },
   });
   t.equals(vars.asset, 'data');
@@ -103,60 +112,94 @@ test('Should handle asyncs/promises in process', async t => {
 });
 
 test('Should fire actions with data from process', async t => {
+  const id = getId();
   const ruleConf = {
-    id: 11,
+    id,
     active: true,
-    process: [{ data: ['rpc', 5] }],
+    process: [{ data: ['rpc', 1] }],
     condition: ['if', true, true],
     actions: [['fire', 1], ['fire', ['var', ['`', 'data']]]],
   };
   const vars = {};
   let result = 0;
+  const targetResult = 2;
   let setDone;
   const done = new Promise(r => {
     setDone = r;
   });
   await loadRule(ruleConf);
-  await runRule(11, vars, {
+  await runRule(id, vars, {
     envExtra: {
-      rpc: id => new Promise(r => setTimeout(r(id), 100)),
+      rpc: name => new Promise(r => setTimeout(r(name), 100)),
       fire: value => {
         result += Number(value);
-        if (result > 5) setDone();
+        if (result >= targetResult) setDone();
       },
     },
   });
   await done;
-  t.equals(result, 6);
+  t.equals(result, targetResult);
 });
 
 test('Should check resetCondition and fire resetActions', async t => {
+  const id = getId();
   const ruleConf = {
-    id: 11,
+    id,
     active: true,
-    process: [{ data: ['rpc', 5] }],
+    process: [{ data: ['rpc', 1] }],
     condition: ['if', true, true],
     resetCondition: ['if', true, true],
     resetActions: [['fire', 1], ['fire', ['var', ['`', 'data']]]],
   };
   const vars = {};
   let result = 0;
+  const targetResult = 2;
   let setDone;
   const done = new Promise(r => {
     setDone = r;
   });
   const parserOptions = {
     envExtra: {
-      rpc: id => new Promise(r => setTimeout(r(id), 100)),
+      rpc: name => new Promise(r => setTimeout(r(name), 100)),
       fire: value => {
         result += Number(value);
-        if (result > 5) setDone();
+        if (result >= targetResult) setDone();
       },
     },
   };
   await loadRule(ruleConf);
-  await runRule(11, vars, parserOptions);
-  await runRule(11, vars, parserOptions);
+  await runRule(id, vars, parserOptions);
+  await runRule(id, vars, parserOptions);
   await done;
-  t.equals(result, 6);
+  t.equals(result, targetResult);
+});
+
+test('Should handle cooldown', async t => {
+  const id = getId();
+  const ruleConf = {
+    id,
+    active: true,
+    cooldown: 1,
+    condition: ['if', true, true],
+    actions: [['fire', 1]],
+  };
+  let result = 0;
+  const targetResult = 1;
+  let setDone;
+  const done = new Promise(r => {
+    setDone = r;
+  });
+  const parserOptions = {
+    envExtra: {
+      fire: value => {
+        result += Number(value);
+        if (result >= targetResult) setDone();
+      },
+    },
+  };
+  await loadRule(ruleConf);
+  await runRule(id, undefined, parserOptions);
+  await runRule(id, undefined, parserOptions);
+  await done;
+  t.equals(result, targetResult);
 });

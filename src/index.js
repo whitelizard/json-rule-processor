@@ -109,6 +109,7 @@ const checkRule = id => {
 };
 
 export const runRule = async (id, vars = {}, parserOptions = {}) => {
+  // console.log('runRule:', id, vars, parserOptions, ruleStore[id]);
   const done = checkRule(id);
   if (done) return undefined;
   const {
@@ -136,6 +137,7 @@ export const runRule = async (id, vars = {}, parserOptions = {}) => {
   // console.log('conditionsMet:', conditionsMet);
   if (conditionsMet) {
     setRuleState(id, { flipped: true, onCooldown: !!cooldown, lastFired: new Date() });
+    // console.log('Flipped.', actions, ruleStore[id]);
     // ruleStore[id] = {
     //   ...ruleStore[id],
     //   flipped: true,

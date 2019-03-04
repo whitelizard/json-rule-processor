@@ -85,7 +85,7 @@ export const createAsyncEvaluator = (parser, patchParser) => async cmd => {
     R.mapObjIndexed((val, key) => {
       if (patchParser) patchParser(parser, key);
       const result = parser.evalWithLog(val);
-      console.log('RESULT:', result);
+      // console.log('RESULT:', result);
       if (result && typeof result.then === 'function') {
         promises.push(result);
         promiseKeys.push(key);
@@ -94,11 +94,11 @@ export const createAsyncEvaluator = (parser, patchParser) => async cmd => {
         valueKeys.push(key);
       }
     })(cmd);
-    console.log('RESULTS 1:', promiseKeys, promises, valueKeys, values);
+    // console.log('RESULTS 1:', promiseKeys, promises, valueKeys, values);
     const promiseValues = await Promise.all(promises);
     const allValues = [...values, ...promiseValues];
     const allKeys = [...valueKeys, ...promiseKeys];
-    console.log('RESULTS 2:', allKeys, allValues);
+    // console.log('RESULTS 2:', allKeys, allValues);
     R.addIndex(R.forEach)((key, ix) => parser.var(key, allValues[ix]))(allKeys);
     return R.zipObj(allKeys, allValues);
   }
