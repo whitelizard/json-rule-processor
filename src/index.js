@@ -50,9 +50,14 @@ const ruleStore = {
 const initialRuleState = {
   active: false,
   flipped: false,
+  onCooldown: false,
   lastFired: addYears(-100)(new Date()),
   // ttl
   // onExpired
+};
+
+const setRuleState = (id, updates, init) => {
+  ruleStore[id] = { ...(init ? initialRuleState : {}), ...(ruleStore[id] || {}), ...updates };
 };
 
 export const loadRule = async (
@@ -63,14 +68,15 @@ export const loadRule = async (
   if (!id) throw new Error(`No ${idKey} found in rule`);
   if (actuator !== 'backend' || !active) return;
   const ttl = ttlStr ? new Date(ttlStr) : addYears(100)(new Date());
-  ruleStore[id] = {
-    ...initialRuleState,
-    ...(ruleStore[id] || {}),
-    conf: ruleConf,
-    active,
-    ttl,
-    onExpired,
-  };
+  setRuleState(id, { conf: ruleConf, active, ttl, onExpired }, true);
+  // ruleStore[id] = {
+  //   ...initialRuleState,
+  //   ...(ruleStore[id] || {}),
+  //   conf: ruleConf,
+  //   active,
+  //   ttl,
+  //   onExpired,
+  // };
   // console.log('creating functionalParser:', vars);
   const parser = functionalParserWithVars(vars, parserOptions);
   if (triggers) await asyncBlockEvaluator(parser, triggers, patchParser);
@@ -83,54 +89,59 @@ export const unloadRule = id => {
 };
 
 const checkRule = id => {
-  const { active, lastFired, flipped, conf, ttl, onExpired } = ruleStore[id];
-  if (!active) return [true];
+  const { active, lastFired, onCooldown, conf, ttl, onExpired } = ruleStore[id];
+  if (!active) return true;
   const now = new Date();
-  const { cooldown = 0, resetCondition } = conf;
-  // console.log('Checking 1:', cooldown, resetCondition);
+  const { cooldown = 0 } = conf;
   if (isBefore(now)(ttl)) {
     // rule has expired
-    ruleStore[id] = { ...ruleStore[id], active: false };
+    setRuleState(id, { active: false });
+    // ruleStore[id] = { ...ruleStore[id], active: false };
     if (onExpired) onExpired(id);
-    return [true];
+    return true;
   }
-  const cooledDown = isBefore(now)(addSeconds(cooldown)(lastFired));
-  // console.log('Checking 2:', cooledDown, lastFired);
-  if (!resetCondition) {
-    if (flipped && !cooledDown) return [true]; // no point continuing
-    if (flipped && cooledDown) {
-      ruleStore[id] = { ...ruleStore[id], flipped: false };
-    }
+  if (onCooldown) {
+    const cooledDown = isBefore(now)(addSeconds(cooldown)(lastFired));
+    if (cooledDown) setRuleState(id, { onCooldown: false });
+    // ruleStore[id] = { ...ruleStore[id], onCooldown: false };
   }
-  return [false, cooledDown]; // continue
+  return false; // continue
 };
 
 export const runRule = async (id, vars = {}, parserOptions = {}) => {
-  const [done, cooledDown] = checkRule(id);
+  const done = checkRule(id);
   if (done) return undefined;
   const {
-    conf: { process, resetCondition, condition, resetActions, actions },
+    conf: { process, resetCondition, condition, resetActions, actions, cooldown },
     flipped,
+    onCooldown,
   } = ruleStore[id];
   const parser = functionalParserWithVars(vars, parserOptions);
   if (process) await asyncBlockEvaluator(parser, process);
-  // console.log('After process:', vars, flipped, resetCondition, condition);
+
   if (flipped && resetCondition) {
     const conditionsMet = parser.evalWithLog(resetCondition);
     if (conditionsMet) {
-      ruleStore[id] = { ...ruleStore[id], flipped: false };
+      setRuleState(id, { flipped: false });
+      // ruleStore[id] = { ...ruleStore[id], flipped: false };
       return asyncBlockEvaluator(parser, resetActions);
     }
     return undefined;
   }
   // console.log('Last check:', flipped, cooledDown);
-  if (flipped || !cooledDown) return undefined;
+  if (flipped || onCooldown) return undefined;
 
   // console.log('Will run condition:', condition, actions);
   const conditionsMet = parser.evalWithLog(condition);
   // console.log('conditionsMet:', conditionsMet);
   if (conditionsMet) {
-    ruleStore[id] = { ...ruleStore[id], flipped: true };
+    setRuleState(id, { flipped: true, onCooldown: !!cooldown, lastFired: new Date() });
+    // ruleStore[id] = {
+    //   ...ruleStore[id],
+    //   flipped: true,
+    //   onCooldown: !!cooldown,
+    //   lastFired: new Date(),
+    // };
     return asyncBlockEvaluator(parser, actions);
   }
   return undefined;
