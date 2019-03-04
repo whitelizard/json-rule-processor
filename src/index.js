@@ -69,15 +69,6 @@ export const loadRule = async (
   if (actuator !== 'backend' || !active) return;
   const ttl = ttlStr ? new Date(ttlStr) : addYears(100)(new Date());
   setRuleState(id, { conf: ruleConf, active, ttl, onExpired }, true);
-  // ruleStore[id] = {
-  //   ...initialRuleState,
-  //   ...(ruleStore[id] || {}),
-  //   conf: ruleConf,
-  //   active,
-  //   ttl,
-  //   onExpired,
-  // };
-  // console.log('creating functionalParser:', vars);
   const parser = functionalParserWithVars(vars, parserOptions);
   if (triggers) await asyncBlockEvaluator(parser, triggers, patchParser);
   else console.warn('Rule has no triggers:', id);
@@ -96,14 +87,12 @@ const checkRule = id => {
   if (isBefore(now)(ttl)) {
     // rule has expired
     setRuleState(id, { active: false });
-    // ruleStore[id] = { ...ruleStore[id], active: false };
     if (onExpired) onExpired(id);
     return true;
   }
   if (onCooldown) {
     const cooledDown = isBefore(now)(addSeconds(cooldown)(lastFired));
     if (cooledDown) setRuleState(id, { onCooldown: false });
-    // ruleStore[id] = { ...ruleStore[id], onCooldown: false };
   }
   return false; // continue
 };
@@ -124,26 +113,15 @@ export const runRule = async (id, vars = {}, parserOptions = {}) => {
     const conditionsMet = parser.evalWithLog(resetCondition);
     if (conditionsMet) {
       setRuleState(id, { flipped: false });
-      // ruleStore[id] = { ...ruleStore[id], flipped: false };
       return asyncBlockEvaluator(parser, resetActions);
     }
     return undefined;
   }
-  // console.log('Last check:', flipped, cooledDown);
   if (flipped || onCooldown) return undefined;
 
-  // console.log('Will run condition:', condition, actions);
   const conditionsMet = parser.evalWithLog(condition);
-  // console.log('conditionsMet:', conditionsMet);
   if (conditionsMet) {
     setRuleState(id, { flipped: true, onCooldown: !!cooldown, lastFired: new Date() });
-    // console.log('Flipped.', actions, ruleStore[id]);
-    // ruleStore[id] = {
-    //   ...ruleStore[id],
-    //   flipped: true,
-    //   onCooldown: !!cooldown,
-    //   lastFired: new Date(),
-    // };
     return asyncBlockEvaluator(parser, actions);
   }
   return undefined;

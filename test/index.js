@@ -203,3 +203,36 @@ test('Should handle cooldown', async t => {
   await done;
   t.equals(result, targetResult);
 });
+
+test('Should handle cooldown together with reset', async t => {
+  const id = getId();
+  const ruleConf = {
+    id,
+    active: true,
+    cooldown: 1,
+    condition: ['if', true, true],
+    actions: [['fire', 1]],
+    resetCondition: ['if', true, true],
+    resetActions: [['fire', 1]],
+  };
+  let result = 0;
+  const targetResult = 2;
+  let setDone;
+  const done = new Promise(r => {
+    setDone = r;
+  });
+  const parserOptions = {
+    envExtra: {
+      fire: value => {
+        result += Number(value);
+        if (result >= targetResult) setDone();
+      },
+    },
+  };
+  await loadRule(ruleConf);
+  await runRule(id, undefined, parserOptions);
+  await new Promise(r => setTimeout(r, 1000));
+  await runRule(id, undefined, parserOptions);
+  await done;
+  t.equals(result, targetResult);
+});
