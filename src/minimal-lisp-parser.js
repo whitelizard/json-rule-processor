@@ -76,14 +76,14 @@ export const functionalParserWithVars = (vars = {}, parserOptions) =>
     minimalLispParser,
   )(parserOptions);
 
-export const createAsyncEvaluator = (parser, patchParser) => async cmd => {
+export const createAsyncEvaluator = (parser, parserPatcher) => async cmd => {
   if (typeof cmd === 'object' && !Array.isArray(cmd)) {
     const promises = [];
     const promiseKeys = [];
     const values = [];
     const valueKeys = [];
     R.mapObjIndexed((val, key) => {
-      if (patchParser) patchParser(parser, key);
+      if (parserPatcher) parserPatcher(parser, key);
       const result = parser.evalWithLog(val);
       // console.log('RESULT:', result);
       if (result && typeof result.then === 'function') {
@@ -105,8 +105,8 @@ export const createAsyncEvaluator = (parser, patchParser) => async cmd => {
   return parser.evalWithLog(cmd);
 };
 
-export const asyncBlockEvaluator = async (parser, block = [], patchParser) => {
-  const asyncEval = createAsyncEvaluator(parser, patchParser);
+export const asyncBlockEvaluator = async (parser, block = [], parserPatcher) => {
+  const asyncEval = createAsyncEvaluator(parser, parserPatcher);
   const recurser = async (items = [], result = []) => {
     if (R.isEmpty(items)) return result;
     const evaluated = await asyncEval(items[0]);

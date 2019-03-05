@@ -62,7 +62,7 @@ const setRuleState = (id, updates, init) => {
 
 export const loadRule = async (
   ruleConf,
-  { parserOptions = {}, idKey = 'id', patchParser, onExpired, vars = {} } = {},
+  { parserOptions = {}, idKey = 'id', parserPatcher, onExpired, vars = {} } = {},
 ) => {
   const { [idKey]: id, triggers, actuator = 'backend', active, ttl: ttlStr = null } = ruleConf;
   if (!id) throw new Error(`No ${idKey} found in rule`);
@@ -70,16 +70,16 @@ export const loadRule = async (
   const ttl = ttlStr ? new Date(ttlStr) : addYears(100)(new Date());
   setRuleState(id, { conf: ruleConf, active, ttl, onExpired }, true);
   const parser = functionalParserWithVars(vars, parserOptions);
-  if (triggers) await asyncBlockEvaluator(parser, triggers, patchParser);
+  if (triggers) await asyncBlockEvaluator(parser, triggers, parserPatcher);
   else console.warn('Rule has no triggers:', id);
 };
 
 export const unloadRule = id => {
-  // TODO: ?????????????????????????????????????
-  // ruleStore = R.dissoc(id);
+  ruleStore[id] = undefined;
 };
 
 const checkRule = id => {
+  if (!ruleStore[id]) return true;
   const { active, lastFired, onCooldown, conf, ttl, onExpired } = ruleStore[id];
   if (!active) return true;
   const now = new Date();
@@ -97,7 +97,7 @@ const checkRule = id => {
   return false; // continue
 };
 
-export const runRule = async (id, vars = {}, parserOptions = {}) => {
+export const runRule = async (id, { vars = {}, parserOptions = {} }) => {
   // console.log('runRule:', id, vars, parserOptions, ruleStore[id]);
   const done = checkRule(id);
   if (done) return undefined;

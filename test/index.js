@@ -47,7 +47,7 @@ test('Should handle ttl expired', async t => {
     {
       id,
       active: true,
-      ttl: Date.now(),
+      ttl: new Date(),
       triggers: [
         ['var', ['`', 'triggersProcessed'], true],
         ['log', ['var', ['`', 'triggersProcessed']]],
@@ -67,7 +67,7 @@ test('Should handle ttl expired', async t => {
   t.ok(vars.processUnprocessed);
 });
 
-test('patchParser effects & arguments', async t => {
+test('parserPatcher effects & arguments', async t => {
   const id = getId();
   const ruleConf = {
     id,
@@ -80,7 +80,7 @@ test('patchParser effects & arguments', async t => {
     setDone = r;
   });
   await loadRule(ruleConf, {
-    patchParser: (parser, triggerKey) => {
+    parserPatcher: (parser, triggerKey) => {
       parser.subscribe = ch =>
         client.sub(ch, msg => {
           t.equals(msg.pl[0], 3);
@@ -102,9 +102,12 @@ test('Should handle asyncs/promises in process', async t => {
   };
   const vars = {};
   await loadRule(ruleConf);
-  await runRule(id, vars, {
-    envExtra: {
-      rpc: name => new Promise(r => setTimeout(r(name), 100)),
+  await runRule(id, {
+    vars,
+    parserOptions: {
+      envExtra: {
+        rpc: name => new Promise(r => setTimeout(r(name), 100)),
+      },
     },
   });
   t.equals(vars.asset, 'data');
@@ -128,12 +131,15 @@ test('Should fire actions with data from process', async t => {
     setDone = r;
   });
   await loadRule(ruleConf);
-  await runRule(id, vars, {
-    envExtra: {
-      rpc: name => new Promise(r => setTimeout(r(name), 100)),
-      fire: value => {
-        result += Number(value);
-        if (result >= targetResult) setDone();
+  await runRule(id, {
+    vars,
+    parserOptions: {
+      envExtra: {
+        rpc: name => new Promise(r => setTimeout(r(name), 100)),
+        fire: value => {
+          result += Number(value);
+          if (result >= targetResult) setDone();
+        },
       },
     },
   });
@@ -168,8 +174,8 @@ test('Should check resetCondition and fire resetActions', async t => {
     },
   };
   await loadRule(ruleConf);
-  await runRule(id, vars, parserOptions);
-  await runRule(id, vars, parserOptions);
+  await runRule(id, { vars, parserOptions });
+  await runRule(id, { vars, parserOptions });
   await done;
   t.equals(result, targetResult);
 });
@@ -198,8 +204,8 @@ test('Should handle cooldown', async t => {
     },
   };
   await loadRule(ruleConf);
-  await runRule(id, undefined, parserOptions);
-  await runRule(id, undefined, parserOptions);
+  await runRule(id, { parserOptions });
+  await runRule(id, { parserOptions });
   await done;
   t.equals(result, targetResult);
 });
@@ -230,9 +236,56 @@ test('Should handle cooldown together with reset', async t => {
     },
   };
   await loadRule(ruleConf);
-  await runRule(id, undefined, parserOptions);
+  await runRule(id, { parserOptions });
   await new Promise(r => setTimeout(r, 1000));
-  await runRule(id, undefined, parserOptions);
+  await runRule(id, { parserOptions });
+  await done;
+  t.equals(result, targetResult);
+});
+
+test('README example 1', async t => {
+  const id = getId();
+  const ruleConf = {
+    id,
+    active: true,
+    cooldown: 1,
+    triggers: [{ msg: ['subscribe', ['`', 'data/default']] }],
+    process: [{ data: ['rpc', 1] }],
+    condition: ['if', true, true],
+    actions: [['fire', 1]],
+    resetCondition: ['if', true, true],
+    resetActions: [['fire', 1]],
+  };
+  const client = testClient({ ts: String(Date.now() / 1000), pl: [3] });
+  let result = 0;
+  const targetResult = 2;
+  let setDone;
+  const done = new Promise(r => {
+    setDone = r;
+  });
+  const parserOptions = {
+    envExtra: {
+      rpc: name => new Promise(r => setTimeout(r(name), 100)),
+      fire: value => {
+        result += Number(value);
+        if (result >= targetResult) setDone();
+      },
+    },
+  };
+  await loadRule(ruleConf, {
+    parserPatcher: (parser, triggerKey) => {
+      parser.subscribe = ch =>
+        client.sub(ch, msg => {
+          t.equals(msg.pl[0], 3);
+          t.equals(triggerKey, 'msg');
+          setDone();
+          // runRule(ruleConf.rid, triggerKey ? { [triggerKey]: msg } : {});
+        });
+    },
+  });
+  await runRule(id, { parserOptions });
+  await new Promise(r => setTimeout(r, 1000));
+  await runRule(id, { parserOptions });
   await done;
   t.equals(result, targetResult);
 });
