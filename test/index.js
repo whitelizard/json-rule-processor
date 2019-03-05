@@ -4,11 +4,6 @@ import { loadRule, runRule } from '../src/index';
 import { getOrSet } from '../src/minimal-lisp-parser';
 
 // const aTimestamp = 1521663819160 / 1000;
-const testClient = msg => ({
-  sub: (_, cb) => {
-    setTimeout(() => cb(msg), 10);
-  },
-});
 let idCounter = 0;
 const getId = () => {
   idCounter += 1;
@@ -74,7 +69,11 @@ test('parserPatcher effects & arguments', async t => {
     active: true,
     triggers: [{ msg: ['subscribe', ['`', 'data/default']] }],
   };
-  const client = testClient({ ts: String(Date.now() / 1000), pl: [3] });
+  const client = {
+    sub: (_, cb) => {
+      setTimeout(() => cb({ ts: String(Date.now() / 1000), pl: [3] }), 10);
+    },
+  };
   let setDone;
   const done = new Promise(r => {
     setDone = r;
@@ -248,15 +247,25 @@ test('README example 1', async t => {
   const ruleConf = {
     id,
     active: true,
-    cooldown: 1,
-    triggers: [{ msg: ['subscribe', ['`', 'data/default']] }],
-    process: [{ data: ['rpc', 1] }],
+    cooldown: 3,
+    triggers: [{ msg: ['subscribe', ['`', 'temperature']] }],
+    process: [
+      { position: ['rpc', ['`', 'getGPSData']] },
+      { weather: ['rpc', ['`', 'readWeather'], { position: ['var', ['`', 'position']] }] },
+      { tempDiff: ['get', ['`', 'weather.parameters.t']] },
+      { tooFarOff: ['.', 'Math', ['`', 'abs'], ['var', ['`', 'tempDiff']]] },
+    ],
     condition: ['if', true, true],
     actions: [['fire', 1]],
     resetCondition: ['if', true, true],
     resetActions: [['fire', 1]],
   };
-  const client = testClient({ ts: String(Date.now() / 1000), pl: [3] });
+  let timerHandle;
+  const client = {
+    sub: (_, onMsg) => {
+      timerHandle = setInterval(() => onMsg({ ts: String(Date.now() / 1000), pl: [3] }), 500);
+    },
+  };
   let result = 0;
   const targetResult = 2;
   let setDone;
@@ -287,5 +296,6 @@ test('README example 1', async t => {
   await new Promise(r => setTimeout(r, 1000));
   await runRule(id, { parserOptions });
   await done;
+  if (timerHandle) clearInterval(timerHandle);
   t.equals(result, targetResult);
 });
