@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "npx babel-node ./test/index.js",
-    "build": "babel src -d build"
+    "build": "babel src -d dist"
   },
   "repository": {
     "type": "git",
@@ -15,11 +15,11 @@
   "license": "MIT",
   "dependencies": {
     "airbnb-js-shims": "^2.1.1",
+    "cross-fetch": "^3.0.2",
     "date-fns": "^2.0.0-alpha.27",
     "json-transformer-js": "^2.0.0",
     "lodash": "^4.17.11",
     "minimal-lisp": "^1.0.3",
-    "node-fetch": "^2.3.0",
     "ramda": "^0.26.1"
   },
   "devDependencies": {

@@ -1,10 +1,9 @@
 import miniMAL from 'minimal-lisp';
-import { get } from 'lodash/fp';
-import { set } from 'lodash';
+import get from 'lodash/fp/get';
+import set from 'lodash/set';
 import * as R from 'ramda';
-import fetch from 'node-fetch';
 import * as dateFns from 'date-fns/fp';
-// import { createStore } from 'redux';
+import fetch from 'cross-fetch';
 
 export const getOrSet = vars => (path, x) =>
   x === undefined ? get(path, vars) : get(path, set(vars, path, x));
@@ -19,7 +18,6 @@ export const minimalLispParser = ({ envExtra = {}, keepJsEval = false } = {}) =>
     '===': (a, b) => a === b,
     '!==': (a, b) => a !== b,
     '%': (a, b) => a % b,
-    // var: getOrSet(vars),
     get,
     Array,
     Object,
@@ -60,8 +58,8 @@ export const withVars = (vars = {}) => parser => {
 export const withFunctional = parser => {
   // const parser = minimalLispParser(...args);
   R.forEachObjIndexed((func, name) => {
-    if (name !== 'default') parser[name] = func;
-    // if (name !== 'default') parser[`R.${name}`] = func;
+    // if (name !== 'default') parser[name] = func;
+    if (name !== 'default') parser[`R.${name}`] = func;
   }, R);
   R.forEachObjIndexed((func, name) => {
     parser[`D.${name}`] = func;
