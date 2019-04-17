@@ -5,6 +5,35 @@ import * as R from 'ramda';
 import * as dateFns from 'date-fns/fp';
 import fetch from 'cross-fetch';
 
+const defaultStaticContext = {
+  undefined,
+  typeof: a => typeof a, // renaming of miniMAL's 'type'
+  '>': (a, b) => a > b,
+  '<=': (a, b) => a <= b,
+  '>=': (a, b) => a >= b,
+  '===': (a, b) => a === b,
+  '!==': (a, b) => a !== b,
+  '%': (a, b) => a % b,
+  get,
+  Array,
+  Object,
+  String,
+  Number,
+  Promise,
+  Date,
+  Math,
+  setInterval,
+  setTimeout,
+  parseInt,
+  parseFloat,
+  Set,
+  Map,
+  RegExp,
+  fetch,
+  console,
+  log: console.log,
+};
+
 export const getOrSet = vars => (path, x) => {
   console.log('[miniMAL parser].var args:', path, ',', x);
   const result = x === undefined ? get(path, vars) : get(path, set(vars, path, x));
@@ -13,35 +42,13 @@ export const getOrSet = vars => (path, x) => {
 };
 
 export const minimalLispParser = ({ envExtra = {}, keepJsEval = false } = {}) => {
-  const parser = miniMAL({
-    undefined,
-    typeof: a => typeof a, // renaming of miniMAL's 'type'
-    '>': (a, b) => a > b,
-    '<=': (a, b) => a <= b,
-    '>=': (a, b) => a >= b,
-    '===': (a, b) => a === b,
-    '!==': (a, b) => a !== b,
-    '%': (a, b) => a % b,
-    get,
-    Array,
-    Object,
-    String,
-    Number,
-    Promise,
-    Date,
-    Math,
-    setInterval,
-    setTimeout,
-    parseInt,
-    parseFloat,
-    Set,
-    Map,
-    RegExp,
-    fetch,
-    console,
-    log: console.log,
-    ...envExtra,
-  });
+  const parser = miniMAL();
+  R.forEachObjIndexed(
+    (func, name) => {
+      parser[name] = func;
+    },
+    { ...defaultStaticContext, ...envExtra },
+  );
   if (!keepJsEval) {
     parser.js = () => {
       throw new Error('Permission denied');
