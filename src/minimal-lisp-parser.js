@@ -42,7 +42,7 @@ export const getOrSet = vars => (path, x) => {
 };
 
 export const minimalLispParser = ({ envExtra = {}, keepJsEval = false } = {}) => {
-  const parser = miniMAL();
+  const parser = miniMAL({});
   R.forEachObjIndexed(
     (func, name) => {
       parser[name] = func;
