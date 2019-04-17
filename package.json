@@ -1,6 +1,6 @@
 {
   "name": "json-rule-processor",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Process JSON config of rule with conditions, actions, cooldown & more",
   "main": "index.js",
   "scripts": {
