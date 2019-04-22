@@ -1,13 +1,16 @@
 import miniMAL from 'minimal-lisp';
-import { get } from 'lodash/fp';
-import { set } from 'lodash';
+import get from 'lodash/fp/get';
+import set from 'lodash/set';
 import * as R from 'ramda';
-import fetch from 'node-fetch';
 import * as dateFns from 'date-fns/fp';
-// import { createStore } from 'redux';
+import fetch from 'cross-fetch';
 
-export const getOrSet = vars => (path, x) =>
-  x === undefined ? get(path, vars) : get(path, set(vars, path, x));
+export const getOrSet = vars => (path, x) => {
+  console.log('[miniMAL parser].var args:', path, ',', x);
+  const result = x === undefined ? get(path, vars) : get(path, set(vars, path, x));
+  console.log('[miniMAL parser].var:', result);
+  return result;
+};
 
 export const minimalLispParser = ({ envExtra = {}, keepJsEval = false } = {}) => {
   const parser = miniMAL({
@@ -19,7 +22,6 @@ export const minimalLispParser = ({ envExtra = {}, keepJsEval = false } = {}) =>
     '===': (a, b) => a === b,
     '!==': (a, b) => a !== b,
     '%': (a, b) => a % b,
-    // var: getOrSet(vars),
     get,
     Array,
     Object,
@@ -46,9 +48,12 @@ export const minimalLispParser = ({ envExtra = {}, keepJsEval = false } = {}) =>
     };
   }
   parser.evalWithLog = (...a) => {
-    console.log('miniMAL.eval:', ...a);
-    return parser.eval(...a);
+    console.log('miniMAL.eval in:', ...a);
+    const result = parser.eval(...a);
+    console.log('miniMAL.eval out:', result);
+    return result;
   };
+  console.log('miniMAL parser:', parser);
   return parser;
 };
 
@@ -60,8 +65,8 @@ export const withVars = (vars = {}) => parser => {
 export const withFunctional = parser => {
   // const parser = minimalLispParser(...args);
   R.forEachObjIndexed((func, name) => {
-    if (name !== 'default') parser[name] = func;
-    // if (name !== 'default') parser[`R.${name}`] = func;
+    // if (name !== 'default') parser[name] = func;
+    if (name !== 'default') parser[`R.${name}`] = func;
   }, R);
   R.forEachObjIndexed((func, name) => {
     parser[`D.${name}`] = func;
