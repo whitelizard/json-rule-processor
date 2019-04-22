@@ -222,6 +222,10 @@ test('Should handle cooldown together with reset', async t => {
   t.equals(result, targetResult);
 });
 
+//
+//  TODO: if reuseParser, vars should be merged/loaded????
+//
+
 test('README example 1', async t => {
   const conf = {
     active: true,
