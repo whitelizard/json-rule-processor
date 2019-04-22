@@ -31,7 +31,7 @@ const check = (conf, state, onExpired) => {
   return [false, state]; // continue
 };
 
-export const load = async (
+export const statelessLoad = async (
   conf = {},
   { parserOptions: pOptions = {}, parserPatcher, vars: vs = {} } = {},
 ) => {
@@ -82,4 +82,15 @@ export const load = async (
   /* eslint-disable consistent-return */
   return [initialState, run];
   /* eslint-enable consistent-return */
+};
+
+export const load = async (...a) => {
+  let state = {};
+  const loaded = await statelessLoad(...a);
+  [state] = loaded;
+  return async (...b) => {
+    const runned = await loaded[1](state, ...b);
+    [state] = runned;
+    return runned[1];
+  };
 };

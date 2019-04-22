@@ -1,6 +1,6 @@
 import test from 'blue-tape';
 import { addYears } from 'date-fns/fp';
-import { load, initialRuleState, getTtl } from '../src/index2';
+import { load, initialRuleState, getTtl, statelessLoad } from '../src/index2';
 import { getOrSet } from '../src/minimal-lisp-parser';
 
 test('Parser "var" should modify vars', async t => {
@@ -12,7 +12,7 @@ test('Parser "var" should modify vars', async t => {
 });
 
 test('Load empty rule -> initial state + function', async t => {
-  const [state, run] = await load({});
+  const [state, run] = await statelessLoad({});
   const { active, flipped, onCooldown, lastFired, ttl } = state;
   t.equals(active || flipped || onCooldown, false);
   t.equals(!!lastFired && !!ttl, true);
@@ -20,7 +20,7 @@ test('Load empty rule -> initial state + function', async t => {
 });
 
 test("Shouldn't run rule if not active", async t => {
-  const [state, run] = await load({});
+  const [state, run] = await statelessLoad({});
   const [, result] = await run(state);
   t.equals(result, undefined);
 });
@@ -29,7 +29,7 @@ test('Should handle ttl expired', async t => {
   let expired = false;
   const triggerVars = { triggersProcessed: false };
   const vars = { processUnprocessed: true };
-  const [state, run] = await load(
+  const [state, run] = await statelessLoad(
     {
       active: true,
       ttl: new Date(),
@@ -68,7 +68,7 @@ test('parserPatcher effects & arguments', async t => {
     setDone = r;
   });
   // const [state, run] =
-  await load(conf, {
+  await statelessLoad(conf, {
     parserPatcher: (parser, triggerKey) => {
       parser.subscribe = ch =>
         sub(ch, msg => {
@@ -88,7 +88,7 @@ test('Should handle asyncs/promises in process', async t => {
     process: [{ asset: ['rpc', ['`', 'data']] }, { theAsset: ['var', ['`', 'asset']] }],
   };
   const vars = {};
-  const [state, run] = await load(conf);
+  const [state, run] = await statelessLoad(conf);
   await run(state, {
     vars,
     parserOptions: {
@@ -115,7 +115,7 @@ test('Should fire actions with data from process', async t => {
   const done = new Promise(r => {
     setDone = r;
   });
-  const [state, run] = await load(conf);
+  const [state, run] = await statelessLoad(conf);
   await run(state, {
     vars,
     parserOptions: {
@@ -156,7 +156,7 @@ test('Should check resetCondition and fire resetActions', async t => {
       },
     },
   };
-  const [state, run] = await load(conf);
+  const [state, run] = await statelessLoad(conf);
   const [state2] = await run(state, { vars, parserOptions });
   await run(state2, { vars, parserOptions });
   await done;
@@ -184,7 +184,7 @@ test('Should handle cooldown', async t => {
       },
     },
   };
-  const [state, run] = await load(conf);
+  const [state, run] = await statelessLoad(conf);
   const [state2] = await run(state, { parserOptions });
   await run(state2, { parserOptions });
   await done;
@@ -214,7 +214,7 @@ test('Should handle cooldown together with reset', async t => {
       },
     },
   };
-  const [state, run] = await load(conf);
+  const [state, run] = await statelessLoad(conf);
   await run(state, { parserOptions });
   await new Promise(r => setTimeout(r, 1000));
   await run(state, { parserOptions });
@@ -229,8 +229,14 @@ test('README example 1', async t => {
     triggers: [{ msg: ['subscribe', ['`', 'temperature']] }],
     process: [
       { position: ['rpc', ['`', 'getGPSData']] },
-      { weather: ['rpc', ['`', 'readWeather'], { position: ['var', ['`', 'position']] }] },
-      { tempDiff: ['get', ['`', 'weather.parameters.t']] },
+      {
+        weather: [
+          'rpc',
+          ['`', 'readWeather'],
+          ['R.objOf', ['`', 'position'], ['var', ['`', 'position']]],
+        ],
+      },
+      { tempDiff: ['var', ['`', 'weather.parameters.t']] },
       { tooFarOff: ['.', 'Math', ['`', 'abs'], ['var', ['`', 'tempDiff']]] },
     ],
     // condition: ['if', true, true],
@@ -241,7 +247,7 @@ test('README example 1', async t => {
   let timerHandle;
   const client = {
     sub: (_, onMsg) => {
-      timerHandle = setInterval(() => onMsg({ ts: String(Date.now() / 1000), pl: [3] }), 500);
+      timerHandle = setInterval(() => onMsg({ ts: new Date().toISOString, pl: [3] }), 500);
     },
   };
   let result = 0;
@@ -250,29 +256,43 @@ test('README example 1', async t => {
   const done = new Promise(r => {
     setDone = r;
   });
-  const parserOptions = {
-    envExtra: {
-      rpc: name => new Promise(r => setTimeout(r(name), 100)),
-      fire: value => {
-        result += Number(value);
-        if (result >= targetResult) setDone();
+  let run;
+  const options = {
+    parserOptions: {
+      envExtra: {
+        rpc: (name, args) => {
+          console.log('---> RPC:', name, args);
+          if (name === 'getGPSData') {
+            t.equals(args, undefined);
+            return new Promise(r => setTimeout(r({ lon: 15, lat: 55 }), 100));
+          }
+          if (name === 'readWeather') {
+            t.equals(args.position.lon, 15);
+            // if (args.position.lon !== 15) throw new Error('WRONG PARAM');
+            return new Promise(r => setTimeout(r({ parameters: { t: -3.2 } }), 100));
+          }
+          throw new Error('WRONG RPC NAME');
+        },
+        fire: value => {
+          result += Number(value);
+          if (result >= targetResult) setDone();
+        },
       },
     },
-  };
-  const [state, run] = await load(conf, {
     parserPatcher: (parser, triggerKey) => {
       parser.subscribe = ch =>
         client.sub(ch, msg => {
-          run(state, triggerKey ? { [triggerKey]: msg } : {});
+          run(triggerKey ? { vars: { [triggerKey]: msg } } : {});
         });
     },
-  });
+  };
+  run = await load(conf, options);
   // t.equals(msg.pl[0], 3);
   // t.equals(triggerKey, 'msg');
   // setDone();
-  const [state2, value] = await run(state, { parserOptions });
+  await run();
   await new Promise(r => setTimeout(r, 1000));
-  await run(state2, { parserOptions });
+  await run();
   await done;
   if (timerHandle) clearInterval(timerHandle);
   t.equals(result, targetResult);
