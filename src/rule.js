@@ -2,7 +2,7 @@ import 'airbnb-js-shims';
 // import getTransformer, { builtInTransforms } from 'json-transformer-js';
 // import miniMAL from 'minimal-lisp';
 // import _ from 'lodash/fp';
-import { isBefore, addSeconds, addYears } from 'date-fns/fp';
+// import { isBefore, addSeconds, addYears } from 'date-fns/fp';
 // import * as R from 'ramda';
 // import { createStore } from 'redux';
 import { functionalParserWithVars, asyncBlockEvaluator } from './minimal-lisp-parser';
@@ -43,35 +43,32 @@ import { functionalParserWithVars, asyncBlockEvaluator } from './minimal-lisp-pa
 //   ),
 // );
 
-const ruleStore = {
-  // <id>: { conf: <ruleConf>, active, flipped, lastFired }
-};
+// const ruleStore = {
+// <id>: { conf: <ruleConf>, active, flipped, lastFired }
+// };
 
-const initialRuleState = {
-  active: false,
-  flipped: false,
-  onCooldown: false,
-  lastFired: addYears(-100)(new Date()),
-  // ttl
-  // onExpired
-};
+// const initialRuleState = {
+// active: false,
+// flipped: false,
+// onCooldown: false,
+// lastFired: addYears(-100)(new Date()),
+// ttl
+// onExpired
+// };
 
-const setRuleState = (id, updates, init) => {
-  ruleStore[id] = { ...(init ? initialRuleState : {}), ...(ruleStore[id] || {}), ...updates };
-};
+// const setRuleState = (id, updates, init) => {
+//   ruleStore[id] = { ...(init ? initialRuleState : {}), ...(ruleStore[id] || {}), ...updates };
+// };
 
-export const loadRule = async (
-  ruleConf,
-  { parserOptions = {}, idKey = 'id', parserPatcher, onExpired, vars = {} } = {},
-) => {
-  const { [idKey]: id, triggers, actuator = 'backend', active, ttl: ttlStr = null } = ruleConf;
-  if (!id) throw new Error(`No ${idKey} found in rule`);
-  if (actuator !== 'backend' || !active) return;
-  const ttl = ttlStr ? new Date(ttlStr) : addYears(100)(new Date());
-  setRuleState(id, { conf: ruleConf, active, ttl, onExpired }, true);
+export const loadRule = async (ruleConf, { parserOptions = {}, parserPatcher, vars = {} } = {}) => {
+  const { triggers } = ruleConf;
+  // if (!id) throw new Error(`No ${idKey} found in rule`);
+  // if (actuator !== 'backend' || !active) return;
+  // const ttl = ttlStr ? new Date(ttlStr) : addYears(100)(new Date());
+  // setRuleState(id, { conf: ruleConf, active, ttl, onExpired }, true);
   const parser = functionalParserWithVars(vars, parserOptions);
   if (triggers) await asyncBlockEvaluator(parser, triggers, parserPatcher);
-  else console.warn('Rule has no triggers:', id);
+  else console.warn('Rule has no triggers');
 };
 
 export const unloadRule = id => {

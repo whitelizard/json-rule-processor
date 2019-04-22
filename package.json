@@ -4,7 +4,7 @@
   "description": "Process JSON config of rule with conditions, actions & more",
   "main": "index.js",
   "scripts": {
-    "test": "npx babel-node ./test/index.js",
+    "test": "npx babel-node ./test/index2.js",
     "build": "babel src -d build"
   },
   "repository": {
