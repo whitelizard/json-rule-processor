@@ -1,14 +1,7 @@
 import test from 'blue-tape';
 import { addYears } from 'date-fns/fp';
-import { load, initialRuleState } from '../src/index2';
+import { load, initialRuleState, getTtl } from '../src/index2';
 import { getOrSet } from '../src/minimal-lisp-parser';
-
-// const aTimestamp = 1521663819160 / 1000;
-let idCounter = 0;
-const getId = () => {
-  idCounter += 1;
-  return idCounter;
-};
 
 test('Parser "var" should modify vars', async t => {
   const vars = { test: 1 };
@@ -19,25 +12,25 @@ test('Parser "var" should modify vars', async t => {
 });
 
 test('Load empty rule -> initial state + function', async t => {
-  const [state, run] = load({});
-  t.same(state, initialRuleState);
+  const [state, run] = await load({});
+  const { active, flipped, onCooldown, lastFired, ttl } = state;
+  t.equals(active || flipped || onCooldown, false);
+  t.equals(!!lastFired && !!ttl, true);
   t.equals(typeof run, 'function');
 });
 
 test("Shouldn't run rule if not active", async t => {
-  const [state, run] = load({});
-  const [, result] = run(state);
+  const [state, run] = await load({});
+  const [, result] = await run(state);
   t.equals(result, undefined);
 });
 
 test('Should handle ttl expired', async t => {
-  const id = getId();
   let expired = false;
   const triggerVars = { triggersProcessed: false };
   const vars = { processUnprocessed: true };
-  await load(
+  const [state, run] = await load(
     {
-      id,
       active: true,
       ttl: new Date(),
       triggers: [
@@ -47,42 +40,42 @@ test('Should handle ttl expired', async t => {
       process: [['var', ['`', 'processUnprocessed'], false]],
     },
     {
-      onExpired: () => {
-        expired = true;
-      },
       vars: triggerVars,
     },
   );
-  await run(id, { vars });
-  t.ok(expired);
-  t.ok(triggerVars.triggersProcessed);
-  t.ok(vars.processUnprocessed);
+  const [, result] = await run(state, {
+    vars,
+    onExpired: () => {
+      expired = true;
+    },
+  });
+  t.equals(result, undefined);
+  t.equals(expired, true);
+  t.equals(triggerVars.triggersProcessed, true);
+  t.equals(vars.processUnprocessed, true);
 });
 
 test('parserPatcher effects & arguments', async t => {
-  const id = getId();
-  const ruleConf = {
-    id,
+  const conf = {
     active: true,
     triggers: [{ msg: ['subscribe', ['`', 'data/default']] }],
   };
-  const client = {
-    sub: (_, cb) => {
-      setTimeout(() => cb({ ts: String(Date.now() / 1000), pl: [3] }), 10);
-    },
+  const sub = (_, cb) => {
+    setTimeout(() => cb({ ts: String(Date.now() / 1000), pl: [3] }), 10);
   };
   let setDone;
   const done = new Promise(r => {
     setDone = r;
   });
-  await load(ruleConf, {
+  // const [state, run] =
+  await load(conf, {
     parserPatcher: (parser, triggerKey) => {
       parser.subscribe = ch =>
-        client.sub(ch, msg => {
+        sub(ch, msg => {
           t.equals(msg.pl[0], 3);
           t.equals(triggerKey, 'msg');
           setDone();
-          // run(ruleConf.rid, triggerKey ? { [triggerKey]: msg } : {});
+          // run(conf.rid, triggerKey ? { [triggerKey]: msg } : {});
         });
     },
   });
@@ -90,15 +83,13 @@ test('parserPatcher effects & arguments', async t => {
 });
 
 test('Should handle asyncs/promises in process', async t => {
-  const id = getId();
-  const ruleConf = {
-    id,
+  const conf = {
     active: true,
     process: [{ asset: ['rpc', ['`', 'data']] }, { theAsset: ['var', ['`', 'asset']] }],
   };
   const vars = {};
-  await load(ruleConf);
-  await run(id, {
+  const [state, run] = await load(conf);
+  await run(state, {
     vars,
     parserOptions: {
       envExtra: {
@@ -111,9 +102,7 @@ test('Should handle asyncs/promises in process', async t => {
 });
 
 test('Should fire actions with data from process', async t => {
-  const id = getId();
-  const ruleConf = {
-    id,
+  const conf = {
     active: true,
     process: [{ data: ['rpc', 1] }],
     condition: ['if', true, true],
@@ -126,8 +115,8 @@ test('Should fire actions with data from process', async t => {
   const done = new Promise(r => {
     setDone = r;
   });
-  await load(ruleConf);
-  await run(id, {
+  const [state, run] = await load(conf);
+  await run(state, {
     vars,
     parserOptions: {
       envExtra: {
@@ -144,9 +133,7 @@ test('Should fire actions with data from process', async t => {
 });
 
 test('Should check resetCondition and fire resetActions', async t => {
-  const id = getId();
-  const ruleConf = {
-    id,
+  const conf = {
     active: true,
     process: [{ data: ['rpc', 1] }],
     condition: ['if', true, true],
@@ -169,17 +156,15 @@ test('Should check resetCondition and fire resetActions', async t => {
       },
     },
   };
-  await load(ruleConf);
-  await run(id, { vars, parserOptions });
-  await run(id, { vars, parserOptions });
+  const [state, run] = await load(conf);
+  const [state2] = await run(state, { vars, parserOptions });
+  await run(state2, { vars, parserOptions });
   await done;
   t.equals(result, targetResult);
 });
 
 test('Should handle cooldown', async t => {
-  const id = getId();
-  const ruleConf = {
-    id,
+  const conf = {
     active: true,
     cooldown: 1,
     condition: ['if', true, true],
@@ -199,17 +184,15 @@ test('Should handle cooldown', async t => {
       },
     },
   };
-  await load(ruleConf);
-  await run(id, { parserOptions });
-  await run(id, { parserOptions });
+  const [state, run] = await load(conf);
+  const [state2] = await run(state, { parserOptions });
+  await run(state2, { parserOptions });
   await done;
   t.equals(result, targetResult);
 });
 
 test('Should handle cooldown together with reset', async t => {
-  const id = getId();
-  const ruleConf = {
-    id,
+  const conf = {
     active: true,
     cooldown: 1,
     condition: ['if', true, true],
@@ -231,18 +214,16 @@ test('Should handle cooldown together with reset', async t => {
       },
     },
   };
-  await load(ruleConf);
-  await run(id, { parserOptions });
+  const [state, run] = await load(conf);
+  await run(state, { parserOptions });
   await new Promise(r => setTimeout(r, 1000));
-  await run(id, { parserOptions });
+  await run(state, { parserOptions });
   await done;
   t.equals(result, targetResult);
 });
 
 test('README example 1', async t => {
-  const id = getId();
-  const ruleConf = {
-    id,
+  const conf = {
     active: true,
     cooldown: 3,
     triggers: [{ msg: ['subscribe', ['`', 'temperature']] }],
@@ -252,7 +233,7 @@ test('README example 1', async t => {
       { tempDiff: ['get', ['`', 'weather.parameters.t']] },
       { tooFarOff: ['.', 'Math', ['`', 'abs'], ['var', ['`', 'tempDiff']]] },
     ],
-    condition: ['if', true, true],
+    // condition: ['if', true, true],
     actions: [['fire', 1]],
     resetCondition: ['if', true, true],
     resetActions: [['fire', 1]],
@@ -265,10 +246,10 @@ test('README example 1', async t => {
   };
   let result = 0;
   const targetResult = 2;
-  // let setDone;
-  // const done = new Promise(r => {
-  //   setDone = r;
-  // });
+  let setDone;
+  const done = new Promise(r => {
+    setDone = r;
+  });
   const parserOptions = {
     envExtra: {
       rpc: name => new Promise(r => setTimeout(r(name), 100)),
@@ -278,20 +259,20 @@ test('README example 1', async t => {
       },
     },
   };
-  await load(ruleConf, {
+  const [state, run] = await load(conf, {
     parserPatcher: (parser, triggerKey) => {
       parser.subscribe = ch =>
         client.sub(ch, msg => {
-          run(ruleConf.rid, triggerKey ? { [triggerKey]: msg } : {});
+          run(state, triggerKey ? { [triggerKey]: msg } : {});
         });
     },
   });
   // t.equals(msg.pl[0], 3);
   // t.equals(triggerKey, 'msg');
   // setDone();
-  await run(id, { parserOptions });
+  const [state2, value] = await run(state, { parserOptions });
   await new Promise(r => setTimeout(r, 1000));
-  await run(id, { parserOptions });
+  await run(state2, { parserOptions });
   await done;
   if (timerHandle) clearInterval(timerHandle);
   t.equals(result, targetResult);

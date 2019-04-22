@@ -11,7 +11,9 @@ export const initialRuleState = {
   // onExpired
 };
 
-const checkRule = (conf, state, onExpired) => {
+export const getTtl = ttlStr => (ttlStr ? new Date(ttlStr) : addYears(100)(new Date()));
+
+const check = (conf, state, onExpired) => {
   if (!state) return [true, state];
   const { active, lastFired, onCooldown, ttl } = state;
   if (!active) return [true, state];
@@ -30,11 +32,11 @@ const checkRule = (conf, state, onExpired) => {
 };
 
 export const load = async (
-  conf,
+  conf = {},
   { parserOptions: pOptions = {}, parserPatcher, vars: vs = {} } = {},
 ) => {
-  const { triggers, active, ttl: ttlStr = null } = conf;
-  const ttl = ttlStr ? new Date(ttlStr) : addYears(100)(new Date());
+  const { triggers, active = false, ttl: ttlStr = null } = conf;
+  const ttl = getTtl(ttlStr);
   const initialState = { ...initialRuleState, active, ttl };
   let parser;
   if (active) {
@@ -43,23 +45,27 @@ export const load = async (
     else console.warn('Rule has no triggers:', conf.id || conf.rid || conf.name);
   }
 
-  const runRule = async (
+  const run = async (
     state = {},
-    { reuseParser = false, parserOptions = {}, vars = {}, onExpired },
+    { reuseParser = false, parserOptions = {}, vars = {}, onExpired } = {},
   ) => {
-    // console.log('runRule:', id, vars, parserOptions, state);
-    const [done, maybeNewState] = checkRule(conf, state, onExpired);
+    // console.log('run:', id, vars, parserOptions, state);
+    const [done, maybeNewState] = check(conf, state, onExpired);
     if (done) return [maybeNewState, undefined];
     let states = maybeNewState;
     const { process, resetCondition, condition, resetActions, actions, cooldown } = conf;
-    const runParser = reuseParser ? parser : functionalParserWithVars(vars, parserOptions);
+    const runParser =
+      reuseParser && parser ? parser : functionalParserWithVars(vars, parserOptions);
     if (process) await asyncBlockEvaluator(runParser, process);
 
     if (states.flipped && resetCondition) {
       const conditionsMet = runParser.evalWithLog(resetCondition);
       if (conditionsMet) {
         states = { ...states, flipped: false };
-        return [states, resetActions ? asyncBlockEvaluator(runParser, resetActions) : undefined];
+        return [
+          states,
+          await (resetActions ? asyncBlockEvaluator(runParser, resetActions) : undefined),
+        ];
       }
       return [states, undefined];
     }
@@ -69,11 +75,11 @@ export const load = async (
     const conditionsMet = condition === undefined ? true : runParser.evalWithLog(condition);
     if (conditionsMet) {
       states = { ...states, flipped: true, onCooldown: !!cooldown, lastFired: new Date() };
-      return [states, actions ? asyncBlockEvaluator(runParser, actions) : undefined];
+      return [states, await (actions ? asyncBlockEvaluator(runParser, actions) : undefined)];
     }
     return [states, undefined];
   };
   /* eslint-disable consistent-return */
-  return [initialState, runRule];
+  return [initialState, run];
   /* eslint-enable consistent-return */
 };
