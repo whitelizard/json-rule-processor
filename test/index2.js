@@ -257,32 +257,33 @@ test('README example 1', async t => {
     setDone = r;
   });
   let run;
-  const options = {
-    parserOptions: {
-      envExtra: {
-        rpc: (name, args) => {
-          console.log('---> RPC:', name, args);
-          if (name === 'getGPSData') {
-            t.equals(args, undefined);
-            return new Promise(r => setTimeout(r({ lon: 15, lat: 55 }), 100));
-          }
-          if (name === 'readWeather') {
-            t.equals(args.position.lon, 15);
-            // if (args.position.lon !== 15) throw new Error('WRONG PARAM');
-            return new Promise(r => setTimeout(r({ parameters: { t: -3.2 } }), 100));
-          }
-          throw new Error('WRONG RPC NAME');
-        },
-        fire: value => {
-          result += Number(value);
-          if (result >= targetResult) setDone();
-        },
+
+  const parserOptions = {
+    envExtra: {
+      rpc: (name, args) => {
+        console.log('---> RPC:', name, args);
+        if (name === 'getGPSData') {
+          t.equals(args, undefined);
+          return new Promise(r => setTimeout(r({ lon: 15, lat: 55 }), 100));
+        }
+        if (name === 'readWeather') {
+          t.equals(args.position.lon, 15);
+          // if (args.position.lon !== 15) throw new Error('WRONG PARAM');
+          return new Promise(r => setTimeout(r({ parameters: { t: -3.2 } }), 100));
+        }
+        throw new Error('WRONG RPC NAME');
+      },
+      fire: value => {
+        result += Number(value);
+        if (result >= targetResult) setDone();
       },
     },
+  };
+  const options = {
     parserPatcher: (parser, triggerKey) => {
       parser.subscribe = ch =>
         client.sub(ch, msg => {
-          run(triggerKey ? { vars: { [triggerKey]: msg } } : {});
+          run({ parserOptions, ...(triggerKey ? { vars: { [triggerKey]: msg } } : {}) });
         });
     },
   };
@@ -290,9 +291,9 @@ test('README example 1', async t => {
   // t.equals(msg.pl[0], 3);
   // t.equals(triggerKey, 'msg');
   // setDone();
-  await run();
+  await run({ parserOptions });
   await new Promise(r => setTimeout(r, 1000));
-  await run();
+  await run({ parserOptions });
   await done;
   if (timerHandle) clearInterval(timerHandle);
   t.equals(result, targetResult);
