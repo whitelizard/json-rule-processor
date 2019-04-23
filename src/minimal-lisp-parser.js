@@ -12,36 +12,38 @@ export const getOrSet = vars => (path, x) => {
   return result;
 };
 
-export const minimalLispParser = ({ envExtra = {}, keepJsEval = false } = {}) => {
-  const parser = miniMAL({
-    undefined,
-    typeof: a => typeof a, // renaming of miniMAL's 'type'
-    '>': (a, b) => a > b,
-    '<=': (a, b) => a <= b,
-    '>=': (a, b) => a >= b,
-    '===': (a, b) => a === b,
-    '!==': (a, b) => a !== b,
-    '%': (a, b) => a % b,
-    get,
-    Array,
-    Object,
-    String,
-    Number,
-    Promise,
-    Date,
-    Math,
-    setInterval,
-    setTimeout,
-    parseInt,
-    parseFloat,
-    Set,
-    Map,
-    RegExp,
-    fetch,
-    console,
-    log: console.log,
-    ...envExtra,
-  });
+export const minimalLispParser = ({ env, envExtra = {}, keepJsEval = false } = {}) => {
+  const parser = miniMAL(
+    env || {
+      undefined,
+      typeof: a => typeof a, // renaming of miniMAL's 'type'
+      '>': (a, b) => a > b,
+      '<=': (a, b) => a <= b,
+      '>=': (a, b) => a >= b,
+      '===': (a, b) => a === b,
+      '!==': (a, b) => a !== b,
+      '%': (a, b) => a % b,
+      get,
+      Array,
+      Object,
+      String,
+      Number,
+      Promise,
+      Date,
+      Math,
+      setInterval,
+      setTimeout,
+      parseInt,
+      parseFloat,
+      Set,
+      Map,
+      RegExp,
+      fetch,
+      console,
+      log: console.log,
+      ...envExtra,
+    },
+  );
   if (!keepJsEval) {
     parser.js = () => {
       throw new Error('Permission denied');

@@ -1,6 +1,6 @@
 import test from 'blue-tape';
-import { addYears } from 'date-fns/fp';
-import { load, initialRuleState, getTtl, statelessLoad } from '../src/index2';
+// import { addYears } from 'date-fns/fp';
+import { load, statelessLoad } from '../src/index2';
 import { getOrSet } from '../src/minimal-lisp-parser';
 
 test('Parser "var" should modify vars', async t => {
@@ -33,7 +33,7 @@ test('Should handle ttl expired', async t => {
     {
       active: true,
       ttl: new Date(),
-      triggers: [
+      onLoad: [
         ['var', ['`', 'triggersProcessed'], true],
         ['log', ['var', ['`', 'triggersProcessed']]],
       ],
@@ -58,7 +58,7 @@ test('Should handle ttl expired', async t => {
 test('parserPatcher effects & arguments', async t => {
   const conf = {
     active: true,
-    triggers: [{ msg: ['subscribe', ['`', 'data/default']] }],
+    onLoad: [{ msg: ['subscribe', ['`', 'data/default']] }],
   };
   const sub = (_, cb) => {
     setTimeout(() => cb({ ts: String(Date.now() / 1000), pl: [3] }), 10);
@@ -228,11 +228,11 @@ test('Should handle cooldown together with reset', async t => {
 
 test('README example 1', async t => {
   const conf = {
-    active: true,
+    // active: true,
     cooldown: 3,
-    triggers: [{ msg: ['subscribe', ['`', 'temperature']] }],
+    onLoad: [{ msg: ['subscribe', ['`', 'temperature']] }],
     process: [
-      { position: ['rpc', ['`', 'getGPSData']] },
+      { position: ['fetch', ['`', '?f=locationData']] },
       {
         weather: [
           'rpc',
@@ -240,10 +240,11 @@ test('README example 1', async t => {
           ['R.objOf', ['`', 'position'], ['var', ['`', 'position']]],
         ],
       },
-      { tempDiff: ['var', ['`', 'weather.parameters.t']] },
-      { tooFarOff: ['.', 'Math', ['`', 'abs'], ['var', ['`', 'tempDiff']]] },
+      { tempDiff: ['-', ['var', ['`', 'weather.parameters.temp']], 18] },
+      { absDiff: ['.', 'Math', ['`', 'abs'], ['var', ['`', 'tempDiff']]] },
+      { tooFarOff: ['>', ['var', ['`', 'tempDiff']], 2] },
     ],
-    // condition: ['if', true, true],
+    condition: ['if', ['var', ['`', 'tempDiff']], true],
     actions: [['fire', 1]],
     resetCondition: ['if', true, true],
     resetActions: [['fire', 1]],
@@ -266,16 +267,18 @@ test('README example 1', async t => {
     envExtra: {
       rpc: (name, args) => {
         console.log('---> RPC:', name, args);
-        if (name === 'getGPSData') {
-          t.equals(args, undefined);
-          return new Promise(r => setTimeout(r({ lon: 15, lat: 55 }), 100));
-        }
         if (name === 'readWeather') {
           t.equals(args.position.lon, 15);
           // if (args.position.lon !== 15) throw new Error('WRONG PARAM');
-          return new Promise(r => setTimeout(r({ parameters: { t: -3.2 } }), 100));
+          return new Promise(r => setTimeout(r({ parameters: { temp: -3.2 } }), 100));
         }
         throw new Error('WRONG RPC NAME');
+      },
+      fetch: name => {
+        console.log('---> FETCH:', name);
+        if (name === '?f=locationData') {
+          return new Promise(r => setTimeout(r({ lon: 15, lat: 55 }), 100));
+        }
       },
       fire: value => {
         result += Number(value);

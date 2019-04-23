@@ -2,7 +2,7 @@ import 'airbnb-js-shims';
 import { isBefore, addSeconds, addYears } from 'date-fns/fp';
 import { functionalParserWithVars, asyncBlockEvaluator } from './minimal-lisp-parser';
 
-export const initialRuleState = {
+export const initialState = {
   active: false,
   flipped: false,
   onCooldown: false,
@@ -10,8 +10,6 @@ export const initialRuleState = {
   // ttl
   // onExpired
 };
-
-export const getTtl = ttlStr => (ttlStr ? new Date(ttlStr) : addYears(100)(new Date()));
 
 const check = (conf, state, onExpired) => {
   if (!state) return [true, state];
@@ -35,14 +33,14 @@ export const statelessLoad = async (
   conf = {},
   { parserOptions: pOptions = {}, parserPatcher, vars: vs = {} } = {},
 ) => {
-  const { triggers, active = false, ttl: ttlStr = null } = conf;
-  const ttl = getTtl(ttlStr);
-  const initialState = { ...initialRuleState, active, ttl };
+  const { onLoad, active = false, ttl: ttlStr = null } = conf;
+  const ttl = ttlStr ? new Date(ttlStr) : addYears(100)(new Date());
+  const beginState = { ...initialState, active, ttl };
   let parser;
   if (active) {
     parser = functionalParserWithVars(vs, pOptions);
-    if (triggers) await asyncBlockEvaluator(parser, triggers, parserPatcher);
-    else console.warn('Rule has no triggers:', conf.id || conf.rid || conf.name);
+    if (onLoad) await asyncBlockEvaluator(parser, onLoad, parserPatcher);
+    else console.warn('Rule has no onLoad:', conf.id || conf.rid || conf.name);
   }
 
   const run = async (
@@ -80,7 +78,7 @@ export const statelessLoad = async (
     return [states, undefined];
   };
   /* eslint-disable consistent-return */
-  return [initialState, run];
+  return [beginState, run];
   /* eslint-enable consistent-return */
 };
 
