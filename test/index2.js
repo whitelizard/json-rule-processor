@@ -231,6 +231,7 @@ test('README example 1', async t => {
     // active: true,
     cooldown: 3,
     onLoad: [{ msg: ['subscribe', ['`', 'temperature']] }],
+    // onUnload: [],
     process: [
       { position: ['fetch', ['`', '?f=locationData']] },
       {
@@ -244,10 +245,10 @@ test('README example 1', async t => {
       { absDiff: ['.', 'Math', ['`', 'abs'], ['var', ['`', 'tempDiff']]] },
       { tooFarOff: ['>', ['var', ['`', 'tempDiff']], 2] },
     ],
-    condition: ['if', ['var', ['`', 'tempDiff']], true],
-    actions: [['fire', 1]],
-    resetCondition: ['if', true, true],
-    resetActions: [['fire', 1]],
+    condition: ['var', ['`', 'tooFarOff']],
+    actions: [['rpc', ['`', 'startHeater']]],
+    resetCondition: ['if', ['var', ['`', 'tooFarOff']], false, true],
+    resetActions: [['rpc', ['`', 'stopHeater']]],
   };
   let timerHandle;
   const client = {
@@ -290,7 +291,7 @@ test('README example 1', async t => {
     parserPatcher: (parser, triggerKey) => {
       parser.subscribe = ch =>
         client.sub(ch, msg => {
-          run({ parserOptions, ...(triggerKey ? { vars: { [triggerKey]: msg } } : {}) });
+          run(triggerKey ? { vars: { [triggerKey]: msg } } : {});
         });
     },
   };
