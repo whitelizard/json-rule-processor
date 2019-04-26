@@ -6,9 +6,8 @@ import * as dateFns from 'date-fns/fp';
 import fetch from 'cross-fetch';
 
 export const getOrSet = vars => (path, x) => {
-  console.log('[miniMAL parser].var args:', path, ',', x);
   const result = x === undefined ? get(path, vars) : get(path, set(vars, path, x));
-  console.log('[miniMAL parser].var:', result);
+  console.log(`[miniMAL parser].var ${path}:`, result);
   return result;
 };
 
@@ -50,9 +49,9 @@ export const minimalLispParser = ({ env, envExtra = {}, keepJsEval = false } = {
     };
   }
   parser.evalWithLog = (...a) => {
-    console.log('miniMAL.eval in:', ...a);
+    console.log('[miniMAL parser].eval in:', ...a);
     const result = parser.eval(...a);
-    console.log('miniMAL.eval out:', result);
+    console.log('[miniMAL parser].eval out:', result);
     return result;
   };
   // console.log('miniMAL parser:', parser);

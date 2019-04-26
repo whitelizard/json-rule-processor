@@ -31,16 +31,16 @@ const check = (conf, state, onExpired) => {
 
 export const statelessLoad = async (
   conf = {},
-  { parserOptions: pOptions = {}, parserPatcher, vars: vs = {} } = {},
+  { customParser, parserOptions: pOptions = {}, parserPatcher, vars: vs = {} } = {},
 ) => {
   const { onLoad, active = false, ttl: ttlStr = null } = conf;
   const ttl = ttlStr ? new Date(ttlStr) : addYears(100)(new Date());
   const beginState = { ...initialState, active, ttl };
   let parser;
   if (active) {
-    parser = functionalParserWithVars(vs, pOptions);
+    parser = customParser || functionalParserWithVars(vs, pOptions);
     if (onLoad) await asyncBlockEvaluator(parser, onLoad, parserPatcher);
-    else console.warn('Rule has no onLoad:', conf.id || conf.rid || conf.name);
+    else console.warn('Rule has no onLoad:', conf.id || conf.rid || conf.name || 'Noname');
   }
 
   const run = async (

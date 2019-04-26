@@ -55,6 +55,61 @@ test('Should handle ttl expired', async t => {
   t.equals(vars.processUnprocessed, true);
 });
 
+test('Should handle onLoad error', async t => {
+  let result;
+  try {
+    await load({
+      active: true,
+      onLoad: ['nothing', 0],
+    });
+  } catch (err) {
+    result = 'error';
+  }
+  t.equals(result, 'error');
+});
+
+test('Should handle process error', async t => {
+  let result;
+  const run = await load({
+    active: true,
+    process: ['nothing', 0],
+  });
+  try {
+    await run();
+  } catch (err) {
+    result = 'error';
+  }
+  t.equals(result, 'error');
+});
+
+test('Should handle condition error', async t => {
+  let result;
+  const run = await load({
+    active: true,
+    condition: ['nothing', 0],
+  });
+  try {
+    await run();
+  } catch (err) {
+    result = 'error';
+  }
+  t.equals(result, 'error');
+});
+
+test('Should handle actions error', async t => {
+  let result;
+  const run = await load({
+    active: true,
+    actions: ['nothing', 0],
+  });
+  try {
+    await run();
+  } catch (err) {
+    result = 'error';
+  }
+  t.equals(result, 'error');
+});
+
 test('parserPatcher effects & arguments', async t => {
   const conf = {
     active: true,
@@ -244,10 +299,11 @@ test('README example 1', async t => {
       { tempDiff: ['-', ['var', ['`', 'weather.parameters.temp']], 18] },
       { absDiff: ['.', 'Math', ['`', 'abs'], ['var', ['`', 'tempDiff']]] },
       { tooFarOff: ['>', ['var', ['`', 'tempDiff']], 2] },
+      { closeEnough: ['<', ['var', ['`', 'tempDiff']], 1] },
     ],
     condition: ['var', ['`', 'tooFarOff']],
     actions: [['rpc', ['`', 'startHeater']]],
-    resetCondition: ['if', ['var', ['`', 'tooFarOff']], false, true],
+    resetCondition: ['var', ['`', 'closeEnough']],
     resetActions: [['rpc', ['`', 'stopHeater']]],
   };
   let timerHandle;
