@@ -84,29 +84,43 @@ export const functionalParserWithVars = (vars = {}, parserOptions) =>
 
 export const createAsyncEvaluator = (parser, parserPatcher) => async cmd => {
   if (typeof cmd === 'object' && !Array.isArray(cmd)) {
-    const promises = [];
-    const promiseKeys = [];
-    const values = [];
-    const valueKeys = [];
-    R.mapObjIndexed((val, key) => {
+    const promiseMap = R.mapObjIndexed((val, key) => {
       if (parserPatcher) parserPatcher(parser, key);
       const result = parser.evalWithLog(val);
-      // console.log('RESULT:', result);
       if (result && typeof result.then === 'function') {
-        promises.push(result);
-        promiseKeys.push(key);
-      } else {
-        values.push(result);
-        valueKeys.push(key);
+        return result;
       }
+      return Promise.resolve(result);
     })(cmd);
+    const orderedPairs = R.toPairs(promiseMap);
+    const keys = R.map(R.prop(0))(orderedPairs);
+    const vals = R.map(R.prop(1))(orderedPairs);
+    const resolvedValues = await Promise.all(vals);
+    R.addIndex(R.forEach)((key, ix) => parser.var(key, resolvedValues[ix]))(keys);
+    return R.zipObj(keys, resolvedValues);
+    // const promises = [];
+    // const promiseKeys = [];
+    // const values = [];
+    // const valueKeys = [];
+    // R.mapObjIndexed((val, key) => {
+    //   if (parserPatcher) parserPatcher(parser, key);
+    //   const result = parser.evalWithLog(val);
+    //   // console.log('RESULT:', result);
+    //   if (result && typeof result.then === 'function') {
+    //     promises.push(result);
+    //     promiseKeys.push(key);
+    //   } else {
+    //     values.push(result);
+    //     valueKeys.push(key);
+    //   }
+    // })(cmd);
     // console.log('RESULTS 1:', promiseKeys, promises, valueKeys, values);
-    const promiseValues = await Promise.all(promises);
-    const allValues = [...values, ...promiseValues];
-    const allKeys = [...valueKeys, ...promiseKeys];
+    // const promiseValues = await Promise.all(promises);
+    // const allValues = [...values, ...promiseValues];
+    // const allKeys = [...valueKeys, ...promiseKeys];
     // console.log('RESULTS 2:', allKeys, allValues);
-    R.addIndex(R.forEach)((key, ix) => parser.var(key, allValues[ix]))(allKeys);
-    return R.zipObj(allKeys, allValues);
+    // R.addIndex(R.forEach)((key, ix) => parser.var(key, allValues[ix]))(allKeys);
+    // return R.zipObj(allKeys, allValues);
   }
   return parser.evalWithLog(cmd);
 };
