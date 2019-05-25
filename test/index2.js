@@ -362,3 +362,34 @@ test('README example 1', async t => {
   if (timerHandle) clearInterval(timerHandle);
   t.equals(result, targetResult);
 });
+
+test('React Hook', async t => {
+  const conf = {
+    active: true,
+    process: [{ data: ['rpc', 1] }],
+    condition: ['if', true, true],
+    actions: [['fire', 1], ['fire', ['var', ['`', 'data']]]],
+  };
+  const vars = {};
+  let result = 0;
+  const targetResult = 2;
+  let setDone;
+  const done = new Promise(r => {
+    setDone = r;
+  });
+  const [state, run] = await statelessLoad(conf);
+  await run(state, {
+    vars,
+    parserOptions: {
+      envExtra: {
+        rpc: name => new Promise(r => setTimeout(r(name), 100)),
+        fire: value => {
+          result += Number(value);
+          if (result >= targetResult) setDone();
+        },
+      },
+    },
+  });
+  await done;
+  t.equals(result, targetResult);
+});
