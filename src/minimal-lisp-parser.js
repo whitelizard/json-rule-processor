@@ -64,7 +64,6 @@ export const withVars = (vars = {}) => parser => {
 };
 
 export const withFunctional = parser => {
-  // const parser = minimalLispParser(...args);
   R.forEachObjIndexed((func, name) => {
     // if (name !== 'default') parser[name] = func;
     if (name !== 'default') parser[`R.${name}`] = func;
@@ -98,29 +97,6 @@ export const createAsyncEvaluator = (parser, parserPatcher) => async cmd => {
     const resolvedValues = await Promise.all(vals);
     R.addIndex(R.forEach)((key, ix) => parser.var(key, resolvedValues[ix]))(keys);
     return R.zipObj(keys, resolvedValues);
-    // const promises = [];
-    // const promiseKeys = [];
-    // const values = [];
-    // const valueKeys = [];
-    // R.mapObjIndexed((val, key) => {
-    //   if (parserPatcher) parserPatcher(parser, key);
-    //   const result = parser.evalWithLog(val);
-    //   // console.log('RESULT:', result);
-    //   if (result && typeof result.then === 'function') {
-    //     promises.push(result);
-    //     promiseKeys.push(key);
-    //   } else {
-    //     values.push(result);
-    //     valueKeys.push(key);
-    //   }
-    // })(cmd);
-    // console.log('RESULTS 1:', promiseKeys, promises, valueKeys, values);
-    // const promiseValues = await Promise.all(promises);
-    // const allValues = [...values, ...promiseValues];
-    // const allKeys = [...valueKeys, ...promiseKeys];
-    // console.log('RESULTS 2:', allKeys, allValues);
-    // R.addIndex(R.forEach)((key, ix) => parser.var(key, allValues[ix]))(allKeys);
-    // return R.zipObj(allKeys, allValues);
   }
   return parser.evalWithLog(cmd);
 };
