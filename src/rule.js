@@ -10,12 +10,12 @@ export const loadRule = async (ruleConf, { parserOptions = {}, parserPatcher, va
   return async ({ vars = {}, parserOptions = {} }) => {
     // console.log('runRule:', id, vars, parserOptions, ruleStore[id]);
     const { process, condition, actions } = ruleConf;
-    const parser = functionalParserWithVars(vars, parserOptions);
-    if (process) await asyncBlockEvaluator(parser, process);
+    const parsr = functionalParserWithVars(vars, parserOptions);
+    if (process) await asyncBlockEvaluator(parsr, process);
 
-    const conditionsMet = parser.evalWithLog(condition);
+    const conditionsMet = parsr.evalWithLog(condition);
     if (conditionsMet) {
-      return asyncBlockEvaluator(parser, actions);
+      return asyncBlockEvaluator(parsr, actions);
     }
     return undefined;
   };

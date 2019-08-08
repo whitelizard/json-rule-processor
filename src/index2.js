@@ -77,9 +77,7 @@ export const statelessLoad = async (
     }
     return [states, undefined];
   };
-  /* eslint-disable consistent-return */
   return [beginState, run];
-  /* eslint-enable consistent-return */
 };
 
 export const load = async (...a) => {
