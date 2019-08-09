@@ -3,7 +3,7 @@ import 'airbnb-js-shims';
 // import miniMAL from 'minimal-lisp';
 // import _ from 'lodash/fp';
 import { isBefore, addSeconds, addYears } from 'date-fns/fp';
-import * as R from 'ramda';
+// import * as R from 'ramda';
 // import { createStore } from 'redux';
 import { functionalParserWithVars, asyncBlockEvaluator } from './minimal-lisp-parser';
 

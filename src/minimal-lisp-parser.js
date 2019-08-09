@@ -5,49 +5,45 @@ import * as R from 'ramda';
 import * as dateFns from 'date-fns/fp';
 import fetch from 'cross-fetch';
 
-const defaultStaticContext = {
-  undefined,
-  typeof: a => typeof a, // renaming of miniMAL's 'type'
-  '>': (a, b) => a > b,
-  '<=': (a, b) => a <= b,
-  '>=': (a, b) => a >= b,
-  '===': (a, b) => a === b,
-  '!==': (a, b) => a !== b,
-  '%': (a, b) => a % b,
-  get,
-  Array,
-  Object,
-  String,
-  Number,
-  Promise,
-  Date,
-  Math,
-  setInterval,
-  setTimeout,
-  parseInt,
-  parseFloat,
-  Set,
-  Map,
-  RegExp,
-  fetch,
-  console,
-  log: console.log,
-};
+// import { createJispParser } from './jisp';
 
 export const getOrSet = vars => (path, x) => {
-  console.log('[miniMAL parser].var args:', path, ',', x);
   const result = x === undefined ? get(path, vars) : get(path, set(vars, path, x));
-  console.log('[miniMAL parser].var:', result);
+  console.log(`[miniMAL parser].var ${path}:`, result);
   return result;
 };
 
-export const minimalLispParser = ({ envExtra = {}, keepJsEval = false } = {}) => {
-  const parser = miniMAL({});
-  R.forEachObjIndexed(
-    (func, name) => {
-      parser[name] = func;
+export const minimalLispParser = ({ env, envExtra = {}, keepJsEval = false } = {}) => {
+  const parser = miniMAL(
+    env || {
+      undefined,
+      typeof: a => typeof a, // renaming of miniMAL's 'type'
+      '>': (a, b) => a > b,
+      '<=': (a, b) => a <= b,
+      '>=': (a, b) => a >= b,
+      '===': (a, b) => a === b,
+      '!==': (a, b) => a !== b,
+      '%': (a, b) => a % b,
+      get,
+      Array,
+      Object,
+      String,
+      Number,
+      Promise,
+      Date,
+      Math,
+      setInterval,
+      setTimeout,
+      parseInt,
+      parseFloat,
+      Set,
+      Map,
+      RegExp,
+      fetch,
+      console,
+      log: console.log,
+      ...envExtra,
     },
-    { ...defaultStaticContext, ...envExtra },
   );
   if (!keepJsEval) {
     parser.js = () => {
@@ -55,12 +51,12 @@ export const minimalLispParser = ({ envExtra = {}, keepJsEval = false } = {}) =>
     };
   }
   parser.evalWithLog = (...a) => {
-    console.log('miniMAL.eval in:', ...a);
+    console.log('[miniMAL parser].eval in:', ...a);
     const result = parser.eval(...a);
-    console.log('miniMAL.eval out:', result);
+    console.log('[miniMAL parser].eval out:', result);
     return result;
   };
-  console.log('miniMAL parser:', parser);
+  // console.log('miniMAL parser:', parser);
   return parser;
 };
 
@@ -70,7 +66,6 @@ export const withVars = (vars = {}) => parser => {
 };
 
 export const withFunctional = parser => {
-  // const parser = minimalLispParser(...args);
   R.forEachObjIndexed((func, name) => {
     // if (name !== 'default') parser[name] = func;
     if (name !== 'default') parser[`R.${name}`] = func;
@@ -90,29 +85,20 @@ export const functionalParserWithVars = (vars = {}, parserOptions) =>
 
 export const createAsyncEvaluator = (parser, parserPatcher) => async cmd => {
   if (typeof cmd === 'object' && !Array.isArray(cmd)) {
-    const promises = [];
-    const promiseKeys = [];
-    const values = [];
-    const valueKeys = [];
-    R.mapObjIndexed((val, key) => {
+    const promiseMap = R.mapObjIndexed((val, key) => {
       if (parserPatcher) parserPatcher(parser, key);
       const result = parser.evalWithLog(val);
-      // console.log('RESULT:', result);
       if (result && typeof result.then === 'function') {
-        promises.push(result);
-        promiseKeys.push(key);
-      } else {
-        values.push(result);
-        valueKeys.push(key);
+        return result;
       }
+      return Promise.resolve(result);
     })(cmd);
-    // console.log('RESULTS 1:', promiseKeys, promises, valueKeys, values);
-    const promiseValues = await Promise.all(promises);
-    const allValues = [...values, ...promiseValues];
-    const allKeys = [...valueKeys, ...promiseKeys];
-    // console.log('RESULTS 2:', allKeys, allValues);
-    R.addIndex(R.forEach)((key, ix) => parser.var(key, allValues[ix]))(allKeys);
-    return R.zipObj(allKeys, allValues);
+    const orderedPairs = R.toPairs(promiseMap);
+    const keys = R.map(R.prop(0))(orderedPairs);
+    const vals = R.map(R.prop(1))(orderedPairs);
+    const resolvedValues = await Promise.all(vals);
+    R.addIndex(R.forEach)((key, ix) => parser.var(key, resolvedValues[ix]))(keys);
+    return R.zipObj(keys, resolvedValues);
   }
   return parser.evalWithLog(cmd);
 };
