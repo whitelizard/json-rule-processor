@@ -21,10 +21,9 @@ const evalAst = (ast, env, exprs) => {
     // Return new env with symbols in ast bound to
     // corresponding values in exprs
     env = Object.create(env);
-    ast.some((a, i) => {
+    ast.forEach((a, i) => {
       if (a === '&') env[ast[i + 1]] = exprs.slice(i);
       env[a] = exprs[i];
-      return undefined;
     });
     return env;
   }
@@ -51,9 +50,6 @@ const evalAst = (ast, env, exprs) => {
 function evaluate(ast, ctx) {
   while (true) {
     // console.log("evaluate:", ast)
-    if (!Array.isArray(ast)) return evalAst(ast, ctx);
-
-    // apply
     ast = expand(ast, ctx);
     if (!Array.isArray(ast)) return evalAst(ast, ctx);
 
@@ -166,7 +162,10 @@ export const createJispParser = env => {
   // "slurp": (...a) => require("fs").readFileSync(a[0],"utf8"),
   // "load":  (...a) => evaluate(JSON.parse(require("fs").readFileSync(a[0],"utf8")),E),
   obj.rep = a => JSON.stringify(evaluate(JSON.parse(a), obj));
-  obj.eval = a => evaluate(a, obj);
+  obj.eval = a => {
+    console.log('EVAL ctx:', obj);
+    return evaluate(a, obj);
+  };
   return obj;
 };
 

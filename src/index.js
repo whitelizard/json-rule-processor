@@ -1,53 +1,8 @@
 import 'airbnb-js-shims';
-// import getTransformer, { builtInTransforms } from 'json-transformer-js';
-// import miniMAL from 'minimal-lisp';
-// import _ from 'lodash/fp';
 import { isBefore, addSeconds, addYears } from 'date-fns/fp';
-// import * as R from 'ramda';
-// import { createStore } from 'redux';
 import { functionalParserWithVars, asyncBlockEvaluator } from './minimal-lisp-parser';
 
-// TODO: Need a state manager! most.js?
-// TODO: State machine for each rule?
-// TODO: How to model state as streams?
-
-// ---------- TODO: Future refactor to most?
-// const createReducer = (initialState, handlers) => (state = initialState, action) =>
-// R.propOr(R.identity, action.type, handlers)(state, action);
-// const createDispatch = action$ => action => action$.next(action);
-// const action$ = createStream();
-// export const dispatch = createDispatch(action$);
-// const state$ = scan(reducer, initialState, action$);
-// ----------
-
-// const evolveId = (id, update) => R.evolve({ [id]: update });
-//
-// const ruleHandlers = {
-//   updateRule: (state, { id, value }) =>
-//     evolveId(
-//       id,
-//       R.evolve({
-//         flip: R.when(R.isNil(value), R.not, R.always(value)),
-//         flippedTime: '...',
-//       }),
-//     )(state),
-//   addRule: (state, { id }) => ({ ...state, [id]: initialRuleState }),
-// };
-//
-// const { dispatch, getState, subscribe } = createStore(
-//   createReducer(
-//     {
-//       // <id>: { conf: <ruleConf>, active, flipped, lastFired, vars: {} }
-//     },
-//     ruleHandlers,
-//   ),
-// );
-
-const ruleStore = {
-  // <id>: { conf: <ruleConf>, active, flipped, lastFired }
-};
-
-const initialRuleState = {
+export const initialState = {
   active: false,
   flipped: false,
   onCooldown: false,
@@ -56,73 +11,82 @@ const initialRuleState = {
   // onExpired
 };
 
-const setRuleState = (id, updates, init) => {
-  ruleStore[id] = { ...(init ? initialRuleState : {}), ...(ruleStore[id] || {}), ...updates };
-};
-
-export const loadRule = async (
-  ruleConf,
-  { parserOptions = {}, idKey = 'id', parserPatcher, onExpired, vars = {} } = {},
-) => {
-  const { [idKey]: id, triggers, actuator = 'backend', active, ttl: ttlStr = null } = ruleConf;
-  if (!id) throw new Error(`No ${idKey} found in rule`);
-  if (actuator !== 'backend' || !active) return;
-  const ttl = ttlStr ? new Date(ttlStr) : addYears(100)(new Date());
-  setRuleState(id, { conf: ruleConf, active, ttl, onExpired }, true);
-  const parser = functionalParserWithVars(vars, parserOptions);
-  if (triggers) await asyncBlockEvaluator(parser, triggers, parserPatcher);
-  else console.warn('Rule has no triggers:', id);
-};
-
-export const unloadRule = id => {
-  ruleStore[id] = undefined;
-};
-
-const checkRule = id => {
-  if (!ruleStore[id]) return true;
-  const { active, lastFired, onCooldown, conf, ttl, onExpired } = ruleStore[id];
-  if (!active) return true;
+const check = (conf, state, onExpired) => {
+  if (!state) return [true, state];
+  const { active, lastFired, onCooldown, ttl } = state;
+  if (!active) return [true, state];
   const now = new Date();
   const { cooldown = 0 } = conf;
   if (isBefore(now)(ttl)) {
     // rule has expired
-    setRuleState(id, { active: false });
-    if (onExpired) onExpired(id);
-    return true;
+    if (onExpired) onExpired();
+    return [true, { ...state, active: false }];
   }
   if (onCooldown) {
     const cooledDown = isBefore(now)(addSeconds(cooldown)(lastFired));
-    if (cooledDown) setRuleState(id, { onCooldown: false });
+    if (cooledDown) return [false, { ...state, onCooldown: false }]; // continue
   }
-  return false; // continue
+  return [false, state]; // continue
 };
 
-export const runRule = async (id, { vars = {}, parserOptions = {} }) => {
-  // console.log('runRule:', id, vars, parserOptions, ruleStore[id]);
-  const done = checkRule(id);
-  if (done) return undefined;
-  const {
-    conf: { process, resetCondition, condition, resetActions, actions, cooldown },
-    flipped,
-    onCooldown,
-  } = ruleStore[id];
-  const parser = functionalParserWithVars(vars, parserOptions);
-  if (process) await asyncBlockEvaluator(parser, process);
+export const statelessLoad = async (
+  conf = {},
+  { customParser, parserOptions: pOptions = {}, parserPatcher, vars: vs = {} } = {},
+) => {
+  const { onLoad, active = false, ttl: ttlStr = null } = conf;
+  const ttl = ttlStr ? new Date(ttlStr) : addYears(100)(new Date());
+  const beginState = { ...initialState, active, ttl };
+  let parser;
+  if (active) {
+    parser = customParser || functionalParserWithVars(vs, pOptions);
+    if (onLoad) await asyncBlockEvaluator(parser, onLoad, parserPatcher);
+    else console.warn('Rule has no onLoad:', conf.id || conf.rid || conf.name || 'Noname');
+  }
 
-  if (flipped && resetCondition) {
-    const conditionsMet = parser.evalWithLog(resetCondition);
-    if (conditionsMet) {
-      setRuleState(id, { flipped: false });
-      return asyncBlockEvaluator(parser, resetActions);
+  const run = async (
+    state = {},
+    { reuseParser = false, parserOptions = {}, vars = {}, onExpired } = {},
+  ) => {
+    // console.log('run:', id, vars, parserOptions, state);
+    const [done, maybeNewState] = check(conf, state, onExpired);
+    if (done) return [maybeNewState, undefined];
+    let states = maybeNewState;
+    const { process, resetCondition, condition, resetActions, actions, cooldown } = conf;
+    const runParser =
+      reuseParser && parser ? parser : functionalParserWithVars(vars, parserOptions);
+    if (process) await asyncBlockEvaluator(runParser, process);
+
+    if (states.flipped && resetCondition) {
+      const conditionsMet = runParser.evalWithLog(resetCondition);
+      if (conditionsMet) {
+        states = { ...states, flipped: false };
+        return [
+          states,
+          await (resetActions ? asyncBlockEvaluator(runParser, resetActions) : undefined),
+        ];
+      }
+      return [states, undefined];
     }
-    return undefined;
-  }
-  if (flipped || onCooldown) return undefined;
+    const { flipped, onCooldown } = states;
+    if (flipped || onCooldown) return [states, undefined];
 
-  const conditionsMet = parser.evalWithLog(condition);
-  if (conditionsMet) {
-    setRuleState(id, { flipped: true, onCooldown: !!cooldown, lastFired: new Date() });
-    return asyncBlockEvaluator(parser, actions);
-  }
-  return undefined;
+    const conditionsMet = condition === undefined ? true : runParser.evalWithLog(condition);
+    if (conditionsMet) {
+      states = { ...states, flipped: true, onCooldown: !!cooldown, lastFired: new Date() };
+      return [states, await (actions ? asyncBlockEvaluator(runParser, actions) : undefined)];
+    }
+    return [states, undefined];
+  };
+  return [beginState, run];
+};
+
+export const load = async (...a) => {
+  let state = {};
+  const loaded = await statelessLoad(...a);
+  [state] = loaded;
+  return async (...b) => {
+    const runned = await loaded[1](state, ...b);
+    [state] = runned;
+    return runned[1];
+  };
 };
