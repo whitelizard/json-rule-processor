@@ -61,7 +61,7 @@ export const minimalLispParser = ({ env, envExtra = {}, keepJsEval = false } = {
 
 export const withVars = (vars = {}) => parser => {
   parser.var = getOrSet(vars);
-  console.log('miniMAL parser:', parser);
+  // console.log('miniMAL parser:', parser);
   return parser;
 };
 
