@@ -1,6 +1,6 @@
 {
   "name": "async-json-lisp-process",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Load and run async JSON-Lisp configurations - with triggers, conditions, actions & more",
   "main": "index.js",
   "scripts": {
