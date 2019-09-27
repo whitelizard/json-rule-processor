@@ -1,4 +1,4 @@
-# async-json-lisp-config
+# json-rule-processor
 
 Load and run async JSON-Lisp configurations - with triggers, conditions, actions & more.
 
