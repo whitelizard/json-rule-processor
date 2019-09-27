@@ -1,7 +1,7 @@
 {
-  "name": "async-json-lisp-process",
+  "name": "json-rule-processor",
   "version": "0.1.6",
-  "description": "Load and run async JSON-Lisp configurations - with triggers, conditions, actions & more",
+  "description": "Load and run async \"JSON-Lisp\" configurations - with triggers, conditions, actions & more",
   "main": "index.js",
   "scripts": {
     "test": "npx babel-node ./test/index.js",
