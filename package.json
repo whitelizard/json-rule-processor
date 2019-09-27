@@ -1,6 +1,6 @@
 {
   "name": "json-rule-processor",
-  "version": "0.1.6",
+  "version": "1.0.0",
   "description": "Load and run async \"JSON-Lisp\" configurations - with triggers, conditions, actions & more",
   "main": "index.js",
   "scripts": {
