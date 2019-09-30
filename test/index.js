@@ -246,7 +246,7 @@ test('Should handle cooldown - block', async t => {
   t.equals(result, targetResult);
 });
 
-test('Should handle cooldown - pass', async t => {
+test('Should handle cooldown - pass on no cooldown', async t => {
   const conf = {
     active: true,
     // cooldown: 0,
@@ -265,6 +265,32 @@ test('Should handle cooldown - pass', async t => {
   };
   const parserOptions = { envExtra: { fire } };
   const [state, run] = await statelessLoad(conf);
+  const [state2] = await run(state, { parserOptions });
+  await run(state2, { parserOptions });
+  await done;
+  t.equals(result, targetResult);
+});
+
+test('Should handle cooldown - pass on small cooldown and a wait', async t => {
+  const conf = {
+    active: true,
+    cooldown: 0.001,
+    condition: ['if', true, true],
+    actions: [['fire', 1]],
+  };
+  let result = 0;
+  const targetResult = 2;
+  let setDone;
+  const done = new Promise(r => {
+    setDone = r;
+  });
+  const fire = value => {
+    result += Number(value);
+    if (result >= targetResult) setDone();
+  };
+  const parserOptions = { envExtra: { fire } };
+  const [state, run] = await statelessLoad(conf);
+  await new Promise(r => setTimeout(r, 10));
   const [state2] = await run(state, { parserOptions });
   await run(state2, { parserOptions });
   await done;

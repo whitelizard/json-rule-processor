@@ -24,7 +24,7 @@ const check = (conf, state, onExpired) => {
   }
   if (onCooldown && !!cooldown) {
     const cooledDown = isBefore(now)(addSeconds(cooldown)(lastFired));
-    if (cooledDown) return [false, { ...state, onCooldown: false }]; // continue
+    if (cooledDown) return [false, { ...state, onCooldown: false, flipped: false }]; // continue
   }
   return [false, state]; // continue
 };
