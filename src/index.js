@@ -16,13 +16,13 @@ const check = (conf, state, onExpired) => {
   const { active, lastFired, onCooldown, ttl } = state;
   if (!active) return [true, state];
   const now = new Date();
-  const { cooldown = 0 } = conf;
+  const { cooldown } = conf;
   if (isBefore(now)(ttl)) {
     // rule has expired
     if (onExpired) onExpired();
     return [true, { ...state, active: false }];
   }
-  if (onCooldown) {
+  if (onCooldown && !!cooldown) {
     const cooledDown = isBefore(now)(addSeconds(cooldown)(lastFired));
     if (cooledDown) return [false, { ...state, onCooldown: false }]; // continue
   }
@@ -56,8 +56,8 @@ export const statelessLoad = async (
       reuseParser && parser ? parser : functionalParserWithVars(vars, parserOptions);
     if (process) await asyncBlockEvaluator(runParser, process);
 
-    if (states.flipped && resetCondition) {
-      const conditionsMet = runParser.evalWithLog(resetCondition);
+    if (states.flipped && !!resetCondition) {
+      const conditionsMet = runParser.evaluate(resetCondition);
       if (conditionsMet) {
         states = { ...states, flipped: false };
         return [
@@ -70,9 +70,14 @@ export const statelessLoad = async (
     const { flipped, onCooldown } = states;
     if (flipped || onCooldown) return [states, undefined];
 
-    const conditionsMet = condition === undefined ? true : runParser.evalWithLog(condition);
+    const conditionsMet = condition === undefined ? true : runParser.evaluate(condition);
     if (conditionsMet) {
-      states = { ...states, flipped: true, onCooldown: !!cooldown, lastFired: new Date() };
+      states = {
+        ...states,
+        flipped: !!cooldown || !!resetCondition,
+        onCooldown: !!cooldown,
+        lastFired: new Date(),
+      };
       return [states, await (actions ? asyncBlockEvaluator(runParser, actions) : undefined)];
     }
     return [states, undefined];

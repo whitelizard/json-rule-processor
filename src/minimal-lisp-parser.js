@@ -13,7 +13,7 @@ export const getOrSet = vars => (path, x) => {
   return result;
 };
 
-export const minimalLispParser = ({ env, envExtra = {}, keepJsEval = false } = {}) => {
+export const minimalLispParser = ({ env, envExtra = {}, keepJsEval = false, doLog } = {}) => {
   const parser = miniMAL(
     env || {
       undefined,
@@ -51,9 +51,16 @@ export const minimalLispParser = ({ env, envExtra = {}, keepJsEval = false } = {
     };
   }
   parser.evalWithLog = (...a) => {
-    console.log('[miniMAL parser].eval in:', ...a);
+    // DEPRECATED!
+    // console.log('[miniMAL parser].eval in:', ...a);
     const result = parser.eval(...a);
-    console.log('[miniMAL parser].eval out:', result);
+    // console.log('[miniMAL parser].eval out:', result);
+    return result;
+  };
+  parser.evaluate = (...a) => {
+    if (doLog) console.log('[miniMAL parser].eval in:', ...a);
+    const result = parser.eval(...a);
+    if (doLog) console.log('[miniMAL parser].eval out:', result);
     return result;
   };
   return parser;
