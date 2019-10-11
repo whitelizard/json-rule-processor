@@ -4,8 +4,8 @@ import { functionalParserWithVars, asyncBlockEvaluator } from './minimal-lisp-pa
 
 export const initialState = {
   active: false,
-  flipped: false,
-  onCooldown: false,
+  flipped: false, // only connected to resetCondition
+  onCooldown: false, // only connected to cooldown
   lastFired: addYears(-100)(new Date()),
   // ttl
   // onExpired
@@ -24,7 +24,7 @@ const check = (conf, state, onExpired) => {
   }
   if (onCooldown && !!cooldown) {
     const cooledDown = isBefore(now)(addSeconds(cooldown)(lastFired));
-    if (cooledDown) return [false, { ...state, onCooldown: false, flipped: false }]; // continue
+    if (cooledDown) return [false, { ...state, onCooldown: false }]; // continue
   }
   return [false, state]; // continue
 };
@@ -74,7 +74,7 @@ export const statelessLoad = async (
     if (conditionsMet) {
       states = {
         ...states,
-        flipped: !!cooldown || !!resetCondition,
+        flipped: !!resetCondition,
         onCooldown: !!cooldown,
         lastFired: new Date(),
       };

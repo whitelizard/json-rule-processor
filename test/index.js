@@ -161,7 +161,7 @@ test('Should fire actions with data from process', async t => {
     active: true,
     process: [{ data: ['rpc', 1] }],
     condition: ['if', true, true],
-    actions: [['fire', 1], ['fire', ['var', ['`', 'data']]]],
+    actions: [['add', 1], ['add', ['var', ['`', 'data']]]],
   };
   const vars = {};
   let result = 0;
@@ -176,7 +176,7 @@ test('Should fire actions with data from process', async t => {
     parserOptions: {
       envExtra: {
         rpc: name => new Promise(r => setTimeout(r(name), 100)),
-        fire: value => {
+        add: value => {
           result += Number(value);
           if (result >= targetResult) setDone();
         },
@@ -193,7 +193,7 @@ test('Should check resetCondition and fire resetActions', async t => {
     process: [{ data: ['rpc', 1] }],
     condition: ['if', true, true],
     resetCondition: ['if', true, true],
-    resetActions: [['fire', 1], ['fire', ['var', ['`', 'data']]]],
+    resetActions: [['add', 1], ['add', ['var', ['`', 'data']]]],
   };
   const vars = {};
   let result = 0;
@@ -205,7 +205,7 @@ test('Should check resetCondition and fire resetActions', async t => {
   const parserOptions = {
     envExtra: {
       rpc: name => new Promise(r => setTimeout(r(name), 100)),
-      fire: value => {
+      add: value => {
         result += Number(value);
         if (result >= targetResult) setDone();
       },
@@ -223,7 +223,7 @@ test('Should handle cooldown - block', async t => {
     active: true,
     cooldown: 1,
     condition: ['if', true, true],
-    actions: [['fire', 1]],
+    actions: [['add', 1]],
   };
   let result = 0;
   const targetResult = 1;
@@ -233,7 +233,7 @@ test('Should handle cooldown - block', async t => {
   });
   const parserOptions = {
     envExtra: {
-      fire: value => {
+      add: value => {
         result += Number(value);
         if (result >= targetResult) setDone();
       },
@@ -251,7 +251,7 @@ test('Should handle cooldown - pass on no cooldown', async t => {
     active: true,
     // cooldown: 0,
     condition: ['if', true, true],
-    actions: [['fire', 1]],
+    actions: [['add', 1]],
   };
   let result = 0;
   const targetResult = 2;
@@ -259,11 +259,11 @@ test('Should handle cooldown - pass on no cooldown', async t => {
   const done = new Promise(r => {
     setDone = r;
   });
-  const fire = value => {
+  const add = value => {
     result += Number(value);
     if (result >= targetResult) setDone();
   };
-  const parserOptions = { envExtra: { fire } };
+  const parserOptions = { envExtra: { add } };
   const [state, run] = await statelessLoad(conf);
   const [state2] = await run(state, { parserOptions });
   await run(state2, { parserOptions });
@@ -276,7 +276,7 @@ test('Should handle cooldown - pass on small cooldown and a wait', async t => {
     active: true,
     cooldown: 0.001,
     condition: ['if', true, true],
-    actions: [['fire', 1]],
+    actions: [['add', 1]],
   };
   let result = 0;
   const targetResult = 2;
@@ -284,14 +284,15 @@ test('Should handle cooldown - pass on small cooldown and a wait', async t => {
   const done = new Promise(r => {
     setDone = r;
   });
-  const fire = value => {
+  const add = value => {
+    // console.log('FIRE!', value);
     result += Number(value);
     if (result >= targetResult) setDone();
   };
-  const parserOptions = { envExtra: { fire } };
+  const parserOptions = { envExtra: { add } };
   const [state, run] = await statelessLoad(conf);
-  await new Promise(r => setTimeout(r, 10));
   const [state2] = await run(state, { parserOptions });
+  await new Promise(r => setTimeout(r, 10));
   await run(state2, { parserOptions });
   await done;
   t.equals(result, targetResult);
@@ -302,28 +303,73 @@ test('Should handle cooldown together with reset', async t => {
     active: true,
     cooldown: 1,
     condition: ['if', true, true],
-    actions: [['fire', 1]],
+    actions: [['add', 1]],
     resetCondition: ['if', true, true],
-    resetActions: [['fire', 1]],
+    resetActions: [['add', 100]],
   };
   let result = 0;
-  const targetResult = 2;
+  const targetResult = 102;
   let setDone;
   const done = new Promise(r => {
     setDone = r;
   });
-  const parserOptions = {
-    envExtra: {
-      fire: value => {
-        result += Number(value);
-        if (result >= targetResult) setDone();
-      },
-    },
+  const add = value => {
+    // console.log('FIRE!', value);
+    result += Number(value);
+    if (result >= targetResult) setDone();
   };
+  const parserOptions = { envExtra: { add } };
   const [state, run] = await statelessLoad(conf);
+  // console.log('1:', state);
+  const [state2] = await run(state, { parserOptions });
+  // console.log('2:', state2);
+  const [state3] = await run(state2, { parserOptions });
+  // console.log('3:', state3);
+  const [state4] = await run(state3, { parserOptions });
+  await new Promise(r => setTimeout(r, 1200));
+  // console.log('4:', state4);
+  // const [state5] =
+  await run(state4, { parserOptions });
+  // console.log('5:', state5);
+  await done;
+  t.equals(result, targetResult);
+});
+
+test('Should handle reset', async t => {
+  const conf = {
+    active: true,
+    condition: ['if', true, true],
+    actions: [['add', 1]],
+    resetCondition: ['getSignal'],
+    resetActions: [['add', 100]],
+  };
+  let result = 0;
+  const targetResult = 102;
+  let setDone;
+  const done = new Promise(r => {
+    setDone = r;
+  });
+  const add = value => {
+    result += Number(value);
+    if (result >= targetResult) setDone();
+  };
+  let signal = false;
+  const getSignal = () => signal;
+  const parserOptions = { envExtra: { add, getSignal } };
+  let [state, run] = await statelessLoad(conf); // eslint-disable-line prefer-const
+  // console.log('1:', state);
+  [state] = await run(state, { parserOptions });
+  // console.log('2:', state2);
+  [state] = await run(state, { parserOptions });
+  [state] = await run(state, { parserOptions });
+  [state] = await run(state, { parserOptions });
+  // console.log('3:', state3);
+  signal = true;
+  [state] = await run(state, { parserOptions });
+  // console.log('4:', state4);
+  // const [state5] =
   await run(state, { parserOptions });
-  await new Promise(r => setTimeout(r, 1000));
-  await run(state, { parserOptions });
+  // console.log('5:', state5);
   await done;
   t.equals(result, targetResult);
 });
