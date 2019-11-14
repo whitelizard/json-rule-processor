@@ -374,6 +374,51 @@ test('Should handle reset', async t => {
   t.equals(result, targetResult);
 });
 
+test('Use timeout', async t => {
+  const conf = {
+    active: true,
+    condition: ['if', true, true],
+    actions: [
+      [
+        'setTimeout',
+        [
+          'fn',
+          [],
+          [
+            'rpc',
+            ['`', 'mailer/send'],
+            [
+              '`',
+              {
+                to: ['test@test.test'],
+              },
+            ],
+          ],
+        ],
+        2000,
+      ],
+    ],
+  };
+  let setDone;
+  const done = new Promise(r => {
+    setDone = r;
+  });
+  console.log('WAITING -------------------------------------------------');
+  let signal = false;
+  const ts = new Date(Date.now()+600);
+  const rpc = () => {
+    console.log(ts, new Date());
+    t.ok(new Date() > ts, "Timeout not working");
+    setDone();
+  };
+  const parserOptions = { envExtra: { rpc } };
+
+  let [state, run] = await statelessLoad(conf); // eslint-disable-line prefer-const
+  // console.log('1:', state);
+  [state] = await run(state, { parserOptions });
+  await done;
+});
+
 //
 //  TODO: if reuseParser, vars should be merged/loaded????
 //
