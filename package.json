@@ -14,9 +14,9 @@
   "author": "Esbjörn Blomquist",
   "license": "MIT",
   "dependencies": {
-    "airbnb-js-shims": "^2.1.1",
+    "airbnb-js-shims": "^2.2.1",
     "cross-fetch": "^3.0.2",
-    "date-fns": "^2.7.0",
+    "date-fns": "^2.8.0",
     "json-transformer-js": "^4.0.0",
     "lodash": "^4.17.11",
     "minimal-lisp": "^1.0.3",
@@ -27,17 +27,18 @@
     "@babel/core": "^7.7.2",
     "@babel/node": "^7.7.0",
     "@babel/preset-env": "^7.7.1",
+    "@hapi/joi": "^16.1.7",
     "babel-eslint": "^10.0.3",
     "babel-loader": "^8.0.5",
     "blue-tape": "^1.0.0",
     "eslint": "^6.6.0",
     "eslint-config-airbnb-base": "^14.0.0",
-    "eslint-config-prettier": "^6.5.0",
+    "eslint-config-prettier": "^6.7.0",
     "eslint-plugin-import": "^2.18.2",
     "eslint-plugin-node": "^10.0.0",
     "eslint-plugin-prettier": "^3.1.1",
     "prettier": "^1.19.1",
-    "prettier-eslint": "^9.0.0",
+    "prettier-eslint": "^9.0.1",
     "riteway": "^4.0.1"
   }
 }

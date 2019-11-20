@@ -21,6 +21,8 @@ export const minimalLispParser = ({ env, envExtra = {}, keepJsEval = false, doLo
       '>': (a, b) => a > b,
       '<=': (a, b) => a <= b,
       '>=': (a, b) => a >= b,
+      '==': (a, b) => Object.is(a, b),
+      '!=': (a, b) => !Object.is(a, b),
       '===': (a, b) => a === b,
       '!==': (a, b) => a !== b,
       '%': (a, b) => a % b,
