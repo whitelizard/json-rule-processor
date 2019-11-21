@@ -86,21 +86,24 @@ export const withFunctional = parser => {
 };
 
 export const functionalParserWithVars = (vars = {}, parserOptions) =>
-  R.compose(
-    withFunctional,
-    withVars(vars),
-    minimalLispParser,
-  )(parserOptions);
+  R.compose(withFunctional, withVars(vars), minimalLispParser)(parserOptions);
 
 export const createAsyncEvaluator = (parser, parserPatcher) => async cmd => {
   if (typeof cmd === 'object' && !Array.isArray(cmd)) {
     const promiseMap = R.mapObjIndexed((val, key) => {
       if (parserPatcher) parserPatcher(parser, key);
-      const result = parser.evalWithLog(val);
-      if (result && typeof result.then === 'function') {
-        return result;
-      }
-      return Promise.resolve(result);
+      // const result = parser.evaluate(val);
+      return new Promise(r => r(parser.evaluate(val))).catch(err => {
+        console.warn('[miniMAL block parser]', val, '->', err);
+        return undefined;
+      });
+      // if (result && typeof result.then === 'function') {
+      //   return result.catch(err => {
+      //     console.warn('[miniMAL block parser]', val, '->', err);
+      //     return undefined;
+      //   });
+      // }
+      // return Promise.resolve(result);
     })(cmd);
     const orderedPairs = R.toPairs(promiseMap);
     const keys = R.map(R.prop(0))(orderedPairs);
@@ -109,7 +112,14 @@ export const createAsyncEvaluator = (parser, parserPatcher) => async cmd => {
     R.addIndex(R.forEach)((key, ix) => parser.var(key, resolvedValues[ix]))(keys);
     return R.zipObj(keys, resolvedValues);
   }
-  return parser.evalWithLog(cmd);
+  const result = parser.evaluate(cmd);
+  if (result && typeof result.then === 'function') {
+    return result.catch(err => {
+      console.warn('[miniMAL block parser]', cmd, '->', err);
+      return undefined;
+    });
+  }
+  return result;
 };
 
 export const asyncBlockEvaluator = async (parser, block = [], parserPatcher) => {

@@ -1,4 +1,4 @@
-import test from 'blue-tape';
+import { test } from 'tap';
 // import { addYears } from 'date-fns/fp';
 import { load, statelessLoad } from '../src';
 import { getOrSet } from '../src/minimal-lisp-parser';
@@ -36,7 +36,7 @@ test('Should handle ttl expired', async t => {
     ],
     process: [['var', ['`', 'processUnprocessed'], false]],
   };
-  t.equals(Rule.validate(conf).error, undefined);
+  t.equals(!Rule.validate(conf).error, true);
   let expired = false;
   const triggerVars = { triggersProcessed: false };
   const vars = { processUnprocessed: true };
@@ -58,7 +58,7 @@ test('Should handle onLoad error', async t => {
     active: true,
     onLoad: ['nothing', 0],
   };
-  t.equals(Rule.validate(conf).error, undefined);
+  t.equals(!Rule.validate(conf).error, true);
   let result;
   try {
     await load(conf);
@@ -115,7 +115,7 @@ test('parserPatcher effects & arguments', async t => {
     active: true,
     onLoad: [{ msg: ['subscribe', ['`', 'data/default']] }],
   };
-  t.equals(Rule.validate(conf).error, undefined);
+  t.equals(!Rule.validate(conf).error, true);
   const sub = (_, cb) => {
     setTimeout(() => cb({ ts: String(Date.now() / 1000), pl: [3] }), 10);
   };
@@ -143,7 +143,7 @@ test('Should handle asyncs/promises in process', async t => {
     active: true,
     process: [{ asset: ['rpc', ['`', 'data']] }, { theAsset: ['var', ['`', 'asset']] }],
   };
-  t.equals(Rule.validate(conf).error, undefined);
+  t.equals(!Rule.validate(conf).error, true);
   const vars = {};
   const [state, run] = await statelessLoad(conf);
   await run(state, {
@@ -168,8 +168,7 @@ test('Should fire actions with data from process', async t => {
       ['add', ['var', ['`', 'data']]],
     ],
   };
-  t.equals(Rule.validate(conf).error, undefined);
-  const vars = {};
+  t.equals(!Rule.validate(conf).error, true);
   let result = 0;
   const targetResult = 2;
   let setDone;
@@ -178,7 +177,6 @@ test('Should fire actions with data from process', async t => {
   });
   const [state, run] = await statelessLoad(conf);
   await run(state, {
-    vars,
     parserOptions: {
       envExtra: {
         rpc: name => new Promise(r => setTimeout(r(name), 100)),
@@ -193,6 +191,32 @@ test('Should fire actions with data from process', async t => {
   t.equals(result, targetResult);
 });
 
+test('Should not run actions if conditions not met', async t => {
+  const conf = {
+    active: true,
+    process: [{ data: 1 }],
+    condition: ['if', true, false],
+    actions: [
+      ['add', 1],
+      ['add', ['var', ['`', 'data']]],
+    ],
+  };
+  t.equals(!Rule.validate(conf).error, true);
+  let result = 0;
+  const targetResult = 0;
+  const [state, run] = await statelessLoad(conf);
+  await run(state, {
+    parserOptions: {
+      envExtra: {
+        add: value => {
+          result += Number(value);
+        },
+      },
+    },
+  });
+  t.equals(result, targetResult);
+});
+
 test('Should check resetCondition and fire resetActions', async t => {
   const conf = {
     active: true,
@@ -204,7 +228,7 @@ test('Should check resetCondition and fire resetActions', async t => {
       ['add', ['var', ['`', 'data']]],
     ],
   };
-  t.equals(Rule.validate(conf).error, undefined);
+  t.equals(!Rule.validate(conf).error, true);
   const vars = {};
   let result = 0;
   const targetResult = 2;
@@ -235,7 +259,7 @@ test('Should handle cooldown - block', async t => {
     condition: ['if', true, true],
     actions: [['add', 1]],
   };
-  t.equals(Rule.validate(conf).error, undefined);
+  t.equals(!Rule.validate(conf).error, true);
   let result = 0;
   const targetResult = 1;
   let setDone;
@@ -264,7 +288,7 @@ test('Should handle cooldown - pass on no cooldown', async t => {
     condition: ['if', true, true],
     actions: [['add', 1]],
   };
-  t.equals(Rule.validate(conf).error, undefined);
+  t.equals(!Rule.validate(conf).error, true);
   let result = 0;
   const targetResult = 2;
   let setDone;
@@ -290,7 +314,7 @@ test('Should handle cooldown - pass on small cooldown and a wait', async t => {
     condition: ['if', true, true],
     actions: [['add', 1]],
   };
-  t.equals(Rule.validate(conf).error, undefined);
+  t.equals(!Rule.validate(conf).error, true);
   let result = 0;
   const targetResult = 2;
   let setDone;
@@ -320,7 +344,7 @@ test('Should handle cooldown together with reset', async t => {
     resetCondition: ['if', true, true],
     resetActions: [['add', 100]],
   };
-  t.equals(Rule.validate(conf).error, undefined);
+  t.equals(!Rule.validate(conf).error, true);
   let result = 0;
   const targetResult = 102;
   let setDone;
@@ -357,7 +381,7 @@ test('Should handle reset', async t => {
     resetCondition: ['getSignal'],
     resetActions: [['add', 100]],
   };
-  t.equals(Rule.validate(conf).error, undefined);
+  t.equals(!Rule.validate(conf).error, true);
   let result = 0;
   const targetResult = 102;
   let setDone;
@@ -414,13 +438,13 @@ test('Use timeout', async t => {
       ],
     ],
   };
-  t.equals(Rule.validate(conf).error, undefined);
+  t.equals(!Rule.validate(conf).error, true);
   let setDone;
   const done = new Promise(r => {
     setDone = r;
   });
-  console.log('WAITING -------------------------------------------------');
-  const signal = false;
+  console.log('WAITING ---------------------------');
+  // const signal = false;
   const ts = new Date(Date.now() + 600);
   const rpc = () => {
     console.log(ts, new Date());
@@ -445,7 +469,7 @@ test('README example 1', async t => {
     cooldown: 3,
     onLoad: [{ msg: ['subscribe', ['`', 'temperature']] }],
     process: [
-      { position: ['fetch', ['`', '?f=locationData']] },
+      { position: ['fetcher', ['`', '?f=locationData']] },
       {
         weather: [
           'rpc',
@@ -453,23 +477,16 @@ test('README example 1', async t => {
           ['R.objOf', ['`', 'position'], ['var', ['`', 'position']]],
         ],
       },
-      { tempDiff: ['-', ['var', ['`', 'weather.parameters.temp']], 18] },
-      { absDiff: ['.', 'Math', ['`', 'abs'], ['var', ['`', 'tempDiff']]] },
-      { tooFarOff: ['>', ['var', ['`', 'tempDiff']], 2] },
-      { closeEnough: ['<', ['var', ['`', 'tempDiff']], 1] },
+      { tempDiff: ['-', ['var', ['`', 'weather.parameters.temp']], 20] },
+      { tooCold: ['<', ['var', ['`', 'tempDiff']], -2] },
+      { closeEnough: ['>', ['var', ['`', 'tempDiff']], -0.5] },
     ],
-    condition: ['var', ['`', 'tooFarOff']],
+    condition: ['var', ['`', 'tooCold']],
     actions: [['rpc', ['`', 'startHeater']]],
     resetCondition: ['var', ['`', 'closeEnough']],
     resetActions: [['rpc', ['`', 'stopHeater']]],
   };
-  t.equals(Rule.validate(conf).error, undefined);
-  let timerHandle;
-  const client = {
-    sub: (_, onMsg) => {
-      timerHandle = setInterval(() => onMsg({ ts: new Date().toISOString(), pl: [3] }), 500);
-    },
-  };
+  t.equals(!Rule.validate(conf).error, true);
   let result = 0;
   const targetResult = 2;
   let setDone;
@@ -482,40 +499,44 @@ test('README example 1', async t => {
         console.log('---> RPC:', name, args);
         if (name === 'readWeather') {
           t.equals(args.position.lon, 15);
-          // if (args.position.lon !== 15) throw new Error('WRONG PARAM');
-          return new Promise(r => setTimeout(r({ parameters: { temp: -3.2 } }), 100));
+          return new Promise(r => setTimeout(r({ parameters: { temp: 12 + 7.8 * result } }), 100));
         }
-        if (name === 'startHeater') result += 1;
+        if (name === 'startHeater') {
+          result += 1;
+          return undefined;
+        }
         if (name === 'stopHeater') {
           result += 1;
-          setDone();
+          return setDone();
         }
         throw new Error('WRONG RPC NAME');
       },
-      fetch: name => {
-        console.log('---> FETCH:', name);
-        if (name === '?f=locationData') {
-          return new Promise(r => setTimeout(r({ lon: 15, lat: 55 }), 100));
-        }
+      fetcher: () => {
+        return new Promise(r => setTimeout(r({ lon: 15, lat: 55 }), 100));
       },
     },
   };
-  const options = {
+
+  const runOptions = { parserOptions, reuseParser: true };
+
+  let timerHandle;
+  const client = {
+    sub: (_, onMsg) => {
+      timerHandle = setInterval(() => onMsg({ ts: new Date().toISOString(), pl: [3] }), 500);
+    },
+  };
+  const loadOptions = {
     parserPatcher: (parser, triggerKey) => {
       parser.subscribe = ch =>
         client.sub(ch, msg => {
-          run(triggerKey ? { vars: { [triggerKey]: msg } } : {});
+          run({ ...runOptions, ...(triggerKey ? { vars: { [triggerKey]: msg } } : {}) });
         });
     },
+    parserOptions,
   };
-  run = await load(conf, options);
+  run = await load(conf, loadOptions);
   // t.equals(msg.pl[0], 3);
-  // t.equals(triggerKey, 'msg');
-  await run({ parserOptions });
-  await new Promise(r => setTimeout(r, 1000));
-  await run({ parserOptions });
   await done;
-  // setDone();
   if (timerHandle) clearInterval(timerHandle);
   t.equals(result, targetResult);
 });

@@ -87,10 +87,10 @@ export const statelessLoad = async (
 
 export const load = async (...a) => {
   let state = {};
-  const loaded = await statelessLoad(...a);
-  [state] = loaded;
+  const tuple = await statelessLoad(...a);
+  [state] = tuple;
   return async (...b) => {
-    const runned = await loaded[1](state, ...b);
+    const runned = await tuple[1](state, ...b);
     [state] = runned;
     return runned[1];
   };
