@@ -1,8 +1,24 @@
 import { test } from 'tap';
-// import { addYears } from 'date-fns/fp';
+import * as R from 'ramda';
 import { load, statelessLoad } from '../src';
-import { getOrSet } from '../src/minimal-lisp-parser';
+import { getOrSet, minimalLispParser, functionalParserWithVars } from '../src/minimal-lisp-parser';
 import { Rule } from '../src/rule-dm';
+
+test('Basic parser stuff', async t => {
+  const parserOptions = { envExtra: { add5: x => x + 5 } };
+  const parser = minimalLispParser(parserOptions);
+  const cmd = ['add5', 3];
+  t.equals(parser.evaluate(cmd), 8);
+
+  const vars = { value: 5 };
+  const parser2 = functionalParserWithVars(vars, parserOptions);
+  const cmd2 = ['var', ['`', 'result'], ['D.addSeconds', ['var', ['`', 'value']], ['new', 'Date']]];
+  const parsed = parser2.evaluate(cmd2);
+
+  t.equals(parsed, vars.result);
+  t.equals(R.startsWith('2')(vars.result.toISOString()), true);
+  t.equals(R.endsWith('Z')(vars.result.toISOString()), true);
+});
 
 test('Parser "var" should modify vars', async t => {
   const vars = { test: 1 };
@@ -10,6 +26,15 @@ test('Parser "var" should modify vars', async t => {
   myVar('test', 2);
   t.equals(vars.test, 2);
   t.equals(myVar('test'), 2);
+});
+
+test('Load broken rule config -> validation error', async t => {
+  await statelessLoad({ active: 'foo' }).catch(err => {
+    t.equals(err.message, '"active" must be a boolean');
+  });
+  await statelessLoad({ foo: 1 }).catch(err => {
+    t.equals(err.message, '"foo" is not allowed');
+  });
 });
 
 test('Load empty rule -> initial state + function', async t => {
@@ -24,6 +49,18 @@ test("Shouldn't run rule if not active", async t => {
   const [state, run] = await statelessLoad({});
   const [, result] = await run(state);
   t.equals(result, undefined);
+});
+
+test('Rule data model', async t => {
+  const dm = Rule.describe();
+  console.log(JSON.stringify(dm, undefined, 2));
+  console.log(
+    Object.entries(dm.keys).map(([key, value]) => {
+      const {description: {flags: }} = value;
+      return `${key}: ${value.flags.description}`;
+    }),
+  );
+  // t.equals(result, undefined);
 });
 
 test('Should handle ttl expired', async t => {
@@ -72,7 +109,7 @@ test('Should handle process error', async t => {
   let result;
   const run = await load({
     active: true,
-    process: ['nothing', 0],
+    process: [['nothing', 0]],
   });
   try {
     await run();
@@ -100,7 +137,7 @@ test('Should handle actions error', async t => {
   let result;
   const run = await load({
     active: true,
-    actions: ['nothing', 0],
+    actions: [['nothing', 0]],
   });
   try {
     await run();
@@ -478,8 +515,10 @@ test('README example 1', async t => {
         ],
       },
       { tempDiff: ['-', ['var', ['`', 'weather.parameters.temp']], 20] },
-      { tooCold: ['<', ['var', ['`', 'tempDiff']], -2] },
-      { closeEnough: ['>', ['var', ['`', 'tempDiff']], -0.5] },
+      {
+        tooCold: ['<', ['var', ['`', 'tempDiff']], -2],
+        closeEnough: ['>', ['var', ['`', 'tempDiff']], -0.5],
+      },
     ],
     condition: ['var', ['`', 'tooCold']],
     actions: [['rpc', ['`', 'startHeater']]],

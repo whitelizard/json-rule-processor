@@ -8,7 +8,7 @@ export const Rule = joi.object().keys({
   id: joi.string(),
   active: joi
     .boolean()
-    .required()
+    // .required()
     .description('If the rule is active or not. An inactive rule is not run at all.'),
   actuator: joi.string().description('ID of where the rule should be loaded and run.'),
   ttl: joi.date().description('At this time (ISO timestamp) the rule will be set to inactive.'),

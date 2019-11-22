@@ -1,6 +1,7 @@
 import 'airbnb-js-shims';
 import { isBefore, addSeconds, addYears } from 'date-fns/fp';
 import { functionalParserWithVars, asyncBlockEvaluator } from './minimal-lisp-parser';
+import { Rule } from './rule-dm';
 
 export const initialState = {
   active: false,
@@ -33,6 +34,9 @@ export const statelessLoad = async (
   conf = {},
   { customParser, parserOptions: pOptions = {}, parserPatcher, vars: vs = {} } = {},
 ) => {
+  const validation = Rule.validate(conf);
+  if (validation.error) throw validation.error;
+
   const { onLoad, active = false, ttl: ttlStr = null } = conf;
   const ttl = ttlStr ? new Date(ttlStr) : addYears(100)(new Date());
   const beginState = { ...initialState, active, ttl };
