@@ -1,8 +1,11 @@
 import joi from '@hapi/joi';
 
-const miniMALcmd = joi.array().items(joi.string().required(), joi.any());
+const miniMALcmd = joi
+  .array()
+  .min(1)
+  .items(joi.string().required(), joi.any());
 
-const miniMALBlock = joi.array().items(joi.alternatives().try(joi.object().unknown(), miniMALcmd));
+const miniMALBlock = joi.array().items(joi.object().unknown(), miniMALcmd);
 
 export const Rule = joi
   .object()
@@ -23,7 +26,7 @@ export const Rule = joi
       .number()
       .min(0)
       .description("A rule can't be triggered again unless this number of seconds has passed."),
-    onLoad: joi.array().description('MiniMAL command block to run when rule is loaded.'),
+    onLoad: miniMALBlock.description('MiniMAL command block to run when rule is loaded.'),
     process: miniMALBlock.description(
       'MiniMAL command block to run when rule is triggeed, before condition.',
     ),

@@ -139,37 +139,38 @@ Finally we are at the last step of the abstractions staircase, where **"rules"**
 
 ### Rule Data Model
 
-| path               | type         | presence | description                                                                          | default | conforms |
-| ------------------ | ------------ | -------- | ------------------------------------------------------------------------------------ | ------- | -------- |
-| id                 | string       | optional | Identifier for this particular rule.                                                 |         |          |
-| active             | boolean      | optional | If the rule is active or not. An inactive rule is not run at all.                    | false   |          |
-| ttl                | date         | optional | At this time (ISO timestamp) the rule will be set to inactive.                       |         |          |
-| cooldown           | number       | optional | A rule can't be triggered again unless this number of seconds has passed.            |         |          |
-| onLoad             | array        | optional | MiniMAL command block to run when rule is loaded.                                    |         |          |
-| process            | array        | optional | MiniMAL command block to run when rule is triggeed, before condition.                |         |          |
-| process[a\|b]      | alternatives | optional |                                                                                      |         |          |
-| process[a]         | object       | optional |                                                                                      |         |          |
-| process[b]         | array        | optional |                                                                                      |         |          |
-| process[b[]]       | string       | required |                                                                                      |         |          |
-| process[b[]]       | any          | optional |                                                                                      |         |          |
-| condition          | array        | optional | MiniMAL command to check if rule should execute (state to flipped, run actions etc). |         |          |
-| condition[]        | string       | required |                                                                                      |         |          |
-| condition[]        | any          | optional |                                                                                      |         |          |
-| actions            | array        | optional | MiniMAL command block to execute when condition is true (& not in flipped state).    |         |          |
-| actions[a\|b]      | alternatives | optional |                                                                                      |         |          |
-| actions[a]         | object       | optional |                                                                                      |         |          |
-| actions[b]         | array        | optional |                                                                                      |         |          |
-| actions[b[]]       | string       | required |                                                                                      |         |          |
-| actions[b[]]       | any          | optional |                                                                                      |         |          |
-| resetCondition     | array        | optional | MiniMAL command to check if rule should reset, if it is in flipped state.            |         |          |
-| resetCondition[]   | string       | required |                                                                                      |         |          |
-| resetCondition[]   | any          | optional |                                                                                      |         |          |
-| resetActions       | array        | optional | MiniMAL command block to execute when resetCondition is true.                        |         |          |
-| resetActions[a\|b] | alternatives | optional |                                                                                      |         |          |
-| resetActions[a]    | object       | optional |                                                                                      |         |          |
-| resetActions[b]    | array        | optional |                                                                                      |         |          |
-| resetActions[b[]]  | string       | required |                                                                                      |         |          |
-| resetActions[b[]]  | any          | optional |                                                                                      |         |          |
+| path               | type    | presence | description                                                                          | default | conforms |
+| ------------------ | ------- | -------- | ------------------------------------------------------------------------------------ | ------- | -------- |
+| id                 | string  | optional | Identifier for this particular rule.                                                 |         |          |
+| active             | boolean | optional | If the rule is active or not. An inactive rule is not run at all.                    | false   |          |
+| ttl                | date    | optional | At this time (ISO timestamp) the rule will be set to inactive.                       |         |          |
+| cooldown           | number  | optional | A rule can't be triggered again unless this number of seconds has passed.            |         | >=0      |
+| onLoad             | array   | optional | MiniMAL command block to run when rule is loaded.                                    |         |          |
+| onLoad[x]          | object  | optional |                                                                                      |         |          |
+| onLoad[x]          | array   | optional |                                                                                      |         | >=1      |
+| onLoad[x][x]       | string  | required |                                                                                      |         |          |
+| onLoad[x][x]       | any     | optional |                                                                                      |         |          |
+| process            | array   | optional | MiniMAL command block to run when rule is triggeed, before condition.                |         |          |
+| process[x]         | object  | optional |                                                                                      |         |          |
+| process[x]         | array   | optional |                                                                                      |         | >=1      |
+| process[x][x]      | string  | required |                                                                                      |         |          |
+| process[x][x]      | any     | optional |                                                                                      |         |          |
+| condition          | array   | optional | MiniMAL command to check if rule should execute (state to flipped, run actions etc). |         | >=1      |
+| condition[x]       | string  | required |                                                                                      |         |          |
+| condition[x]       | any     | optional |                                                                                      |         |          |
+| actions            | array   | optional | MiniMAL command block to execute when condition is true (& not in flipped state).    |         |          |
+| actions[x]         | object  | optional |                                                                                      |         |          |
+| actions[x]         | array   | optional |                                                                                      |         | >=1      |
+| actions[x][x]      | string  | required |                                                                                      |         |          |
+| actions[x][x]      | any     | optional |                                                                                      |         |          |
+| resetCondition     | array   | optional | MiniMAL command to check if rule should reset, if it is in flipped state.            |         | >=1      |
+| resetCondition[x]  | string  | required |                                                                                      |         |          |
+| resetCondition[x]  | any     | optional |                                                                                      |         |          |
+| resetActions       | array   | optional | MiniMAL command block to execute when resetCondition is true.                        |         |          |
+| resetActions[x]    | object  | optional |                                                                                      |         |          |
+| resetActions[x]    | array   | optional |                                                                                      |         | >=1      |
+| resetActions[x][x] | string  | required |                                                                                      |         |          |
+| resetActions[x][x] | any     | optional |                                                                                      |         |          |
 
 ### Full Rule Example
 
@@ -239,10 +240,16 @@ onLoad: [{ msg: ['subscribe', ['`', 'temperature']] }];
 
 where `msg` is used as the variable name for each message received after the subscription. The more straightforward way of doing this, that doesn't require `parserPatcher`, would be for `subscribe` to take a key name as additional argument.
 
-`load`, at the bottom of the example, is the actual initiator of the whole rule processor. There is also a `statelessLoad` function if one wants to manage the state of each loaded rule explicitly. The `statelessLoad` returns a tuple with both `state` and `run`, like so:
+`load`, at the bottom of the example, is the actual initiator of the whole rule processor.
+
+## Stateless Load
+
+There is also a `statelessLoad` function if one wants to manage the state of each loaded rule explicitly. The `statelessLoad` returns a tuple with both `state` and `run`, like so:
 
 ```js
 import { statelessLoad } from 'json-rule-processor/build';
+
+/* ... */
 
 let state;
 let run;

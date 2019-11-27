@@ -12,8 +12,10 @@ test('Basic parser stuff', async t => {
 
   const vars = { value: 5 };
   const parser2 = functionalParserWithVars(vars, parserOptions);
-  const cmd2 = ['var', ['`', 'result'], ['D.addSeconds', ['var', ['`', 'value']], ['new', 'Date']]];
-  const parsed = parser2.evaluate(cmd2);
+  const cmd2 = ['R.T'];
+  t.equals(parser2.evaluate(cmd2), true);
+  const cmd3 = ['var', ['`', 'result'], ['D.addSeconds', ['var', ['`', 'value']], ['new', 'Date']]];
+  const parsed = parser2.evaluate(cmd3);
 
   t.equals(parsed, vars.result);
   t.equals(R.startsWith('2')(vars.result.toISOString()), true);
@@ -81,15 +83,11 @@ test('Should handle ttl expired', async t => {
 test('Should handle onLoad error', async t => {
   const conf = {
     active: true,
-    onLoad: ['nothing', 0],
+    onLoad: [['nothing', 0]],
   };
   t.equals(!Rule.validate(conf).error, true);
   let result;
-  try {
-    await load(conf);
-  } catch (err) {
-    result = 'error';
-  }
+  await load(conf).catch(() => (result = 'error'));
   t.equals(result, 'error');
 });
 
@@ -99,11 +97,7 @@ test('Should handle process error', async t => {
     active: true,
     process: [['nothing', 0]],
   });
-  try {
-    await run();
-  } catch (err) {
-    result = 'error';
-  }
+  await run().catch(() => (result = 'error'));
   t.equals(result, 'error');
 });
 
@@ -113,11 +107,7 @@ test('Should handle condition error', async t => {
     active: true,
     condition: ['nothing', 0],
   });
-  try {
-    await run();
-  } catch (err) {
-    result = 'error';
-  }
+  await run().catch(() => (result = 'error'));
   t.equals(result, 'error');
 });
 
@@ -127,11 +117,7 @@ test('Should handle actions error', async t => {
     active: true,
     actions: [['nothing', 0]],
   });
-  try {
-    await run();
-  } catch (err) {
-    result = 'error';
-  }
+  await run().catch(() => (result = 'error'));
   t.equals(result, 'error');
 });
 
