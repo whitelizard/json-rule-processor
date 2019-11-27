@@ -51,18 +51,6 @@ test("Shouldn't run rule if not active", async t => {
   t.equals(result, undefined);
 });
 
-test('Rule data model', async t => {
-  const dm = Rule.describe();
-  console.log(JSON.stringify(dm, undefined, 2));
-  console.log(
-    Object.entries(dm.keys).map(([key, value]) => {
-      const {description: {flags: }} = value;
-      return `${key}: ${value.flags.description}`;
-    }),
-  );
-  // t.equals(result, undefined);
-});
-
 test('Should handle ttl expired', async t => {
   const conf = {
     active: true,

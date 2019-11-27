@@ -29,6 +29,42 @@ parser.evaluate(cmd); // -> 8
 - **keepJsEval = false**: By default, `eval` of JavaScript in strings is turned **off** for security reasons, but can be activated with this flag.
 - **doLog**: When using `parser.evaluate`, this tells the parser to log to the console the input and output of the evaluation.
 
+The default set of JavaScript functions/identifiers in the extended parser:
+
+```js
+  undefined,
+  typeof: a => typeof a, // renaming of miniMAL's 'type'
+  '>': (a, b) => a > b,
+  '<=': (a, b) => a <= b,
+  '>=': (a, b) => a >= b,
+  '==': (a, b) => Object.is(a, b),
+  '!=': (a, b) => !Object.is(a, b),
+  '===': (a, b) => a === b,
+  '!==': (a, b) => a !== b,
+  '%': (a, b) => a % b,
+  get,
+  Array,
+  Object,
+  String,
+  Number,
+  Promise,
+  Date,
+  Math,
+  setInterval,
+  setTimeout,
+  parseInt,
+  parseFloat,
+  Set,
+  Map,
+  RegExp,
+  fetch,
+  console,
+  log: console.log,
+```
+
+- `get` is from [lodash](https://lodash.com/docs/4.17.15#get), but the fp version is used, so the arguments have reverse order.
+- All the others you can learn about in a JavaScript reference like MDN (search for the identifier): [https://developer.mozilla.org/en-US/docs/Web/JavaScript](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
+
 ## More extended parser
 
 As a second step, this package offers **functional programming utilities** (ramda & date-fns) to the very basic set of functions offered by miniMAL itself, and it can also add a **controlled scope of variables** that can be used as a bridge to surrounding JavaScript:
@@ -97,9 +133,49 @@ vars.position = await fetcher('?f=locationData');
 vars.tempDiff = vars.weather.parameters.temp - vars.indoorTemp;
 ```
 
+## Rule Processor
+
 Finally we are at the last step of the abstractions staircase, where **"rules"** are possible. These rules are defined by configurations containing a set of keys defined by `rule-dm.js`.
 
+### Rule Data Model
+
+| path               | type         | presence | description                                                                          | default | conforms |
+| ------------------ | ------------ | -------- | ------------------------------------------------------------------------------------ | ------- | -------- |
+| id                 | string       | optional | Identifier for this particular rule.                                                 |         |          |
+| active             | boolean      | optional | If the rule is active or not. An inactive rule is not run at all.                    | false   |          |
+| ttl                | date         | optional | At this time (ISO timestamp) the rule will be set to inactive.                       |         |          |
+| cooldown           | number       | optional | A rule can't be triggered again unless this number of seconds has passed.            |         |          |
+| onLoad             | array        | optional | MiniMAL command block to run when rule is loaded.                                    |         |          |
+| process            | array        | optional | MiniMAL command block to run when rule is triggeed, before condition.                |         |          |
+| process[a\|b]      | alternatives | optional |                                                                                      |         |          |
+| process[a]         | object       | optional |                                                                                      |         |          |
+| process[b]         | array        | optional |                                                                                      |         |          |
+| process[b[]]       | string       | required |                                                                                      |         |          |
+| process[b[]]       | any          | optional |                                                                                      |         |          |
+| condition          | array        | optional | MiniMAL command to check if rule should execute (state to flipped, run actions etc). |         |          |
+| condition[]        | string       | required |                                                                                      |         |          |
+| condition[]        | any          | optional |                                                                                      |         |          |
+| actions            | array        | optional | MiniMAL command block to execute when condition is true (& not in flipped state).    |         |          |
+| actions[a\|b]      | alternatives | optional |                                                                                      |         |          |
+| actions[a]         | object       | optional |                                                                                      |         |          |
+| actions[b]         | array        | optional |                                                                                      |         |          |
+| actions[b[]]       | string       | required |                                                                                      |         |          |
+| actions[b[]]       | any          | optional |                                                                                      |         |          |
+| resetCondition     | array        | optional | MiniMAL command to check if rule should reset, if it is in flipped state.            |         |          |
+| resetCondition[]   | string       | required |                                                                                      |         |          |
+| resetCondition[]   | any          | optional |                                                                                      |         |          |
+| resetActions       | array        | optional | MiniMAL command block to execute when resetCondition is true.                        |         |          |
+| resetActions[a\|b] | alternatives | optional |                                                                                      |         |          |
+| resetActions[a]    | object       | optional |                                                                                      |         |          |
+| resetActions[b]    | array        | optional |                                                                                      |         |          |
+| resetActions[b[]]  | string       | required |                                                                                      |         |          |
+| resetActions[b[]]  | any          | optional |                                                                                      |         |          |
+
+### Full Rule Example
+
 ```js
+import { load } from 'json-rule-processor/build';
+
 const conf = {
   active: true,
   cooldown: 3,
@@ -114,8 +190,10 @@ const conf = {
       ],
     },
     { tempDiff: ['-', ['var', ['`', 'weather.parameters.temp']], 20] },
-    { tooCold: ['<', ['var', ['`', 'tempDiff']], -2] },
-    { closeEnough: ['>', ['var', ['`', 'tempDiff']], -0.5] },
+    {
+      tooCold: ['<', ['var', ['`', 'tempDiff']], -2],
+      closeEnough: ['>', ['var', ['`', 'tempDiff']], -0.5],
+    },
   ],
   condition: ['var', ['`', 'tooCold']],
   actions: [['rpc', ['`', 'startHeater']]],
@@ -150,3 +228,26 @@ const loadOptions = {
 };
 run = await load(conf, loadOptions);
 ```
+
+Notice that `condition` & `resetCondition` are plain miniMAL commands, and `onLoad`, `process`, `actions` & `resetActions` are miniMAL command **blocks**.
+
+In the above example, we are utilizing the rare case of wanting to use a **key** from the `onLoad` config in a function. We achieve this through `parserPatcher`. The config we can then use is
+
+```js
+onLoad: [{ msg: ['subscribe', ['`', 'temperature']] }];
+```
+
+where `msg` is used as the variable name for each message received after the subscription. The more straightforward way of doing this, that doesn't require `parserPatcher`, would be for `subscribe` to take a key name as additional argument.
+
+`load`, at the bottom of the example, is the actual initiator of the whole rule processor. There is also a `statelessLoad` function if one wants to manage the state of each loaded rule explicitly. The `statelessLoad` returns a tuple with both `state` and `run`, like so:
+
+```js
+import { statelessLoad } from 'json-rule-processor/build';
+
+let state;
+let run;
+[state, run] = statelessLoad(conf, loadOptions);
+run(state, runOptions);
+```
+
+where the `run` function then also needs the state as first argument.

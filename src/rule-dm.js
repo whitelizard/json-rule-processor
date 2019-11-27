@@ -5,18 +5,22 @@ const miniMALcmd = joi.array().items(joi.string().required(), joi.any());
 const miniMALBlock = joi.array().items(joi.alternatives().try(joi.object().unknown(), miniMALcmd));
 
 export const Rule = joi.object().keys({
-  id: joi.string(),
+  id: joi.string().description('Identifier for this particular rule.'),
   active: joi
     .boolean()
+    .default(false)
     // .required()
     .description('If the rule is active or not. An inactive rule is not run at all.'),
-  actuator: joi.string().description('ID of where the rule should be loaded and run.'),
+  // actuator: joi
+  //   .string()
+  //   .default('backend')
+  //   .description('ID of where the rule should be loaded and run.'),
   ttl: joi.date().description('At this time (ISO timestamp) the rule will be set to inactive.'),
   cooldown: joi
     .number()
     .min(0)
     .description("A rule can't be triggered again unless this number of seconds has passed."),
-  onLoad: joi.array().description('MiniMAL command or command block to run when rule is loaded.'),
+  onLoad: joi.array().description('MiniMAL command block to run when rule is loaded.'),
   process: miniMALBlock.description(
     'MiniMAL command block to run when rule is triggeed, before condition.',
   ),
