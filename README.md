@@ -175,7 +175,7 @@ Finally we are at the last step of the abstractions staircase, where **"rules"**
 ### Full Rule Example
 
 ```js
-import { load } from 'json-rule-processor/build';
+import { load } from 'json-rule-processor/dist';
 
 const conf = {
   active: true,
@@ -247,7 +247,7 @@ where `msg` is used as the variable name for each message received after the sub
 There is also a `statelessLoad` function if one wants to manage the state of each loaded rule explicitly. The `statelessLoad` returns a tuple with both `state` and `run`, like so:
 
 ```js
-import { statelessLoad } from 'json-rule-processor/build';
+import { statelessLoad } from 'json-rule-processor/dist';
 
 /* ... */
 

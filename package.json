@@ -2,10 +2,10 @@
   "name": "json-rule-processor",
   "version": "1.2.2",
   "description": "Load and run async \"JSON-Lisp\" configurations - with triggers, conditions, actions & more",
-  "main": "build/index.js",
+  "main": "dist/index.js",
   "scripts": {
     "test": "tap",
-    "build": "babel src -d build"
+    "build": "babel src -d dist"
   },
   "repository": {
     "type": "git",
