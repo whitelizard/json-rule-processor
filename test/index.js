@@ -16,10 +16,36 @@ test('Basic parser stuff', async t => {
   t.equals(parser2.evaluate(cmd2), true);
   const cmd3 = ['var', ['`', 'result'], ['D.addSeconds', ['var', ['`', 'value']], ['new', 'Date']]];
   const parsed = parser2.evaluate(cmd3);
-
   t.equals(parsed, vars.result);
   t.equals(R.startsWith('2')(vars.result.toISOString()), true);
   t.equals(R.endsWith('Z')(vars.result.toISOString()), true);
+});
+
+test('Access constraints test', async t => {
+  const parser = functionalParserWithVars();
+  const evalCmd = ['js', ['`', '(() => 2**3)()']];
+  t.throws(() => parser.evaluate(evalCmd), 8);
+  // t.equals(parser.evaluate(evalCmd), 8);
+
+  const dotOpCmd = [
+    [
+      '.',
+      ['.-', ['.-', 'parseInt', ['`', 'constructor']], ['`', 'prototype']],
+      ['`', 'constructor'],
+      ['`', 'return (() => 2**3)();'],
+    ],
+  ];
+  const dotOpRes = parser.evaluate(dotOpCmd);
+  t.equals(dotOpRes, 8);
+
+  const getCmd = [
+    [
+      ['get', ['`', 'constructor.prototype.constructor'], 'parseInt'],
+      ['`', 'return (() => 2**3)();'],
+    ],
+  ];
+  const getRes = parser.evaluate(getCmd);
+  t.equals(getRes, 8);
 });
 
 test('Parser "var" should modify vars', async t => {

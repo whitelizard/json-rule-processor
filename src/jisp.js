@@ -16,38 +16,38 @@ function expand(ast, env) {
   // return ast;
 }
 
-const evalAst = (ast, env, exprs) => {
-  if (exprs) {
-    // Return new env with symbols in ast bound to
-    // corresponding values in exprs
-    env = Object.create(env);
-    ast.forEach((a, i) => {
-      if (a === '&') env[ast[i + 1]] = exprs.slice(i);
-      env[a] = exprs[i];
-    });
-    return env;
-  }
-  // Evaluate the form/ast
-  if (Array.isArray(ast)) {
-    return ast.map(a => evaluate(a, env));
-  }
-  if (typeof ast === 'string') {
-    const val = get(env, ast);
-    return val !== undefined ? val : env.throw(`${ast} not found`);
-  }
-  return ast;
-
-  // return Array.isArray(ast) // list?
-  //   ? ast.map((...a) => evaluate(a[0], ctx)) // list
-  //   : typeof ast !== "string" // symbol?
-  //   ? ast // ast unchanged
-  //   : ast in ctx // symbol in ctx?
-  //   ? ctx[ast] // lookup symbol
-  //   : E.throw(ast + " not found"); // undefined symbol
-};
-
 // 2 args: eval_ast, 3 args: env_bind
 function evaluate(ast, ctx) {
+  const evalAst = (iAst, env, exprs) => {
+    if (exprs) {
+      // Return new env with symbols in iAst bound to
+      // corresponding values in exprs
+      env = Object.create(env);
+      iAst.forEach((a, i) => {
+        if (a === '&') env[iAst[i + 1]] = exprs.slice(i);
+        env[a] = exprs[i];
+      });
+      return env;
+    }
+    // Evaluate the form/iAst
+    if (Array.isArray(iAst)) {
+      return iAst.map(a => evaluate(a, env));
+    }
+    if (typeof iAst === 'string') {
+      const val = get(env, iAst);
+      return val !== undefined ? val : env.throw(`${iAst} not found`);
+    }
+    return iAst;
+
+    // return Array.isArray(iAst) // list?
+    //   ? iAst.map((...a) => evaluate(a[0], ctx)) // list
+    //   : typeof iAst !== "string" // symbol?
+    //   ? iAst // iAst unchanged
+    //   : iAst in ctx // symbol in ctx?
+    //   ? ctx[iAst] // lookup symbol
+    //   : E.throw(iAst + " not found"); // undefined symbol
+  };
+
   while (true) {
     // console.log("evaluate:", ast)
     ast = expand(ast, ctx);
@@ -98,7 +98,7 @@ function evaluate(ast, ctx) {
       }
     } else if (ast[0] === 'fn') {
       // define new function (lambda)
-      const f = (...a) => evaluate(ast[2], evalAst(ast[1], ctx, a));
+      const f = (...a) => evaluate(ast[2], evalAst(ast[1], ctx, a)); // eslint-disable-line
       f.A = [ast[2], ctx, ast[1]];
       return f;
     }
@@ -116,7 +116,7 @@ function evaluate(ast, ctx) {
       ast = arg2;
     } else if (cmd === 'do') {
       // multiple forms (for side-effects)
-      const el = evalAst(ast.slice(1, ast.length - 1), ctx);
+      evalAst(ast.slice(1, ast.length - 1), ctx);
       ast = ast[ast.length - 1];
     } else if (cmd === 'if') {
       // branching conditional
@@ -139,7 +139,6 @@ function evaluate(ast, ctx) {
 
 export const createJispParser = env => {
   const obj = Object.assign(Object.create({ ...env, constructor: createJispParser }), {
-    js: eval, // eslint-disable-line
     // These could all also be interop
     '=': (a, b) => a === b,
     '<': (a, b) => a < b,
@@ -169,4 +168,4 @@ export const createJispParser = env => {
   return obj;
 };
 
-console.log(evalAst([]));
+console.log(evaluate([]));

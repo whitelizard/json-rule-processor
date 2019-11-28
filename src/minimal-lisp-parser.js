@@ -13,48 +13,69 @@ export const getOrSet = vars => (path, x) => {
   return result;
 };
 
-export const minimalLispParser = ({ env, envExtra = {}, keepJsEval = false, doLog } = {}) => {
-  const parser = miniMAL(
-    env || {
-      undefined,
-      typeof: a => typeof a, // renaming of miniMAL's 'type'
-      '>': (a, b) => a > b,
-      '<=': (a, b) => a <= b,
-      '>=': (a, b) => a >= b,
-      '==': (a, b) => Object.is(a, b),
-      '!=': (a, b) => !Object.is(a, b),
-      '===': (a, b) => a === b,
-      '!==': (a, b) => a !== b,
-      '%': (a, b) => a % b,
-      get,
-      Array,
-      Object,
-      String,
-      Number,
-      Promise,
-      Date,
-      Math,
-      setInterval,
-      setTimeout,
-      parseInt,
-      parseFloat,
-      Set,
-      Map,
-      RegExp,
-      fetch,
-      console,
-      log: console.log,
-      ...envExtra,
-    },
-  );
-  if (!keepJsEval) {
-    parser.js = () => {
-      throw new Error('Permission denied');
-    };
-  }
+const initial = {
+  undefined,
+  typeof: a => typeof a, // renaming of miniMAL's 'type'
+  '>': (a, b) => a > b,
+  '<=': (a, b) => a <= b,
+  '>=': (a, b) => a >= b,
+  '==': (a, b) => Object.is(a, b),
+  '!=': (a, b) => !Object.is(a, b),
+  '===': (a, b) => a === b,
+  '!==': (a, b) => a !== b,
+  '%': (a, b) => a % b,
+  // js: () => {
+  //   throw new Error('Permission denied');
+  // },
+};
+
+const patchParser = parser => {
+  parser.js = () => {
+    throw new Error('Permission denied');
+  };
+  parser['.'] = () => {
+    throw new Error('BLEEP');
+  };
+  parser['.-'] = () => {
+    throw new Error('BLEEP');
+  };
+  return parser;
+};
+
+const basicSet = {
+  // get: console.log,
+  get,
+  Array,
+  Object,
+  String,
+  Number,
+  Promise,
+  Date,
+  Math,
+  setInterval,
+  setTimeout,
+  parseInt,
+  parseFloat,
+  Set,
+  Map,
+  RegExp,
+  fetch,
+  console,
+  log: console.log,
+};
+
+export const minimalLispParser = ({ env, envExtra = {}, doLog } = {}) => {
+  const parser = miniMAL({
+    ...initial,
+    ...(env || {}),
+    ...(!env ? { ...basicSet, ...envExtra } : {}),
+  });
+  patchParser(parser);
   parser.evalWithLog = (...a) => {
     // DEPRECATED!
-    // console.log('[miniMAL parser].eval in:', ...a);
+    console.log(
+      'evalWithLog is deprecated. Use evaluate and control logging with doLog parameter.',
+    );
     const result = parser.eval(...a);
     // console.log('[miniMAL parser].eval out:', result);
     return result;
