@@ -1,14 +1,9 @@
 {
+  "endOfLine": "lf",
   "printWidth": 100,
   "singleQuote": true,
   "trailingComma": "all",
   "formatOnSave": true,
-  "overrides": [
-    {
-      "files": "*.js",
-      "options": {
-        "parser": "flow"
-      }
-    }
-  ]
+  "trailingComma": "all",
+  "useTabs": false
 }

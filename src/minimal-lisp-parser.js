@@ -1,3 +1,4 @@
+/* eslint-disable no-param-reassign */
 import miniMAL from 'minimal-lisp';
 import get from 'lodash/fp/get';
 import set from 'lodash/set';
@@ -19,8 +20,8 @@ const initialEnv = {
   '>': (a, b) => a > b,
   '<=': (a, b) => a <= b,
   '>=': (a, b) => a >= b,
-  '==': (a, b) => a == b,
-  '!=': (a, b) => a != b,
+  '==': (a, b) => Object.is(a, b),
+  '!=': (a, b) => !Object.is(a, b),
   '===': (a, b) => a === b,
   '!==': (a, b) => a !== b,
   '%': (a, b) => a % b,
@@ -103,11 +104,7 @@ export const withFunctional = parser => {
 };
 
 export const functionalParserWithVars = (vars = {}, parserOptions) =>
-  R.compose(
-    withFunctional,
-    withVars(vars),
-    minimalLispParser,
-  )(parserOptions);
+  R.compose(withFunctional, withVars(vars), minimalLispParser)(parserOptions);
 
 export const createAsyncEvaluator = (parser, parserPatcher) => async cmd => {
   if (typeof cmd === 'object' && !Array.isArray(cmd)) {
