@@ -13,40 +13,45 @@ export const getOrSet = vars => (path, x) => {
   return result;
 };
 
-export const minimalLispParser = ({ env, envExtra = {}, keepJsEval = false, doLog } = {}) => {
-  const parser = miniMAL(
-    env || {
-      undefined,
-      typeof: a => typeof a, // renaming of miniMAL's 'type'
-      '>': (a, b) => a > b,
-      '<=': (a, b) => a <= b,
-      '>=': (a, b) => a >= b,
-      '==': (a, b) => Object.is(a, b),
-      '!=': (a, b) => !Object.is(a, b),
-      '===': (a, b) => a === b,
-      '!==': (a, b) => a !== b,
-      '%': (a, b) => a % b,
-      get,
-      Array,
-      Object,
-      String,
-      Number,
-      Promise,
-      Date,
-      Math,
-      setInterval,
-      setTimeout,
-      parseInt,
-      parseFloat,
-      Set,
-      Map,
-      RegExp,
-      fetch,
-      console,
-      log: console.log,
-      ...envExtra,
-    },
-  );
+const initialEnv = {
+  undefined,
+  typeof: a => typeof a, // renaming of miniMAL's 'type'
+  '>': (a, b) => a > b,
+  '<=': (a, b) => a <= b,
+  '>=': (a, b) => a >= b,
+  '==': (a, b) => a == b,
+  '!=': (a, b) => a != b,
+  '===': (a, b) => a === b,
+  '!==': (a, b) => a !== b,
+  '%': (a, b) => a % b,
+  '**': (a, b) => a ** b,
+};
+
+const basicEnv = {
+  get,
+  Array,
+  Object,
+  String,
+  Number,
+  Date,
+  Math,
+  parseInt,
+  parseFloat,
+  Set,
+  Map,
+  RegExp,
+  console,
+  log: console.log,
+};
+
+const asyncEnv = {
+  Promise,
+  setInterval,
+  setTimeout,
+  fetch,
+};
+
+const patchParser = ({ doLog, keepJsEval }, parser) => {
   if (!keepJsEval) {
     parser.js = () => {
       throw new Error('Permission denied');
@@ -54,7 +59,9 @@ export const minimalLispParser = ({ env, envExtra = {}, keepJsEval = false, doLo
   }
   parser.evalWithLog = (...a) => {
     // DEPRECATED!
-    // console.log('[miniMAL parser].eval in:', ...a);
+    console.log(
+      'evalWithLog is deprecated. Use evaluate and control logging with doLog parameter.',
+    );
     const result = parser.eval(...a);
     // console.log('[miniMAL parser].eval out:', result);
     return result;
@@ -65,6 +72,16 @@ export const minimalLispParser = ({ env, envExtra = {}, keepJsEval = false, doLo
     if (doLog) console.log('[miniMAL parser].eval out:', result);
     return result;
   };
+  return parser;
+};
+
+export const minimalLispParser = ({ env, envExtra = {}, doLog, keepJsEval } = {}) => {
+  const parser = miniMAL({
+    ...initialEnv,
+    ...(env || {}),
+    ...(!env ? { ...basicEnv, ...asyncEnv, ...envExtra } : {}),
+  });
+  patchParser({ doLog, keepJsEval }, parser);
   return parser;
 };
 
@@ -86,7 +103,11 @@ export const withFunctional = parser => {
 };
 
 export const functionalParserWithVars = (vars = {}, parserOptions) =>
-  R.compose(withFunctional, withVars(vars), minimalLispParser)(parserOptions);
+  R.compose(
+    withFunctional,
+    withVars(vars),
+    minimalLispParser,
+  )(parserOptions);
 
 export const createAsyncEvaluator = (parser, parserPatcher) => async cmd => {
   if (typeof cmd === 'object' && !Array.isArray(cmd)) {
