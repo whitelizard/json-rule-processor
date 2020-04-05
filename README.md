@@ -28,8 +28,9 @@ parser.evaluate(cmd); // -> 8
 - **envExtra = {}**: This is where additional functions can be added to the parser, on top of the default set.
 - **keepJsEval = false**: By default, `eval` of JavaScript in strings is turned **off** for security reasons, but can be activated with this flag.
 - **doLog**: When using `parser.evaluate`, this tells the parser to log to the console the input and output of the evaluation.
+- **noAsync**: Skip adding the standard identifiers that are asynchronous: `Promise`, `setInterval`, `setTimeout`, `fetch`.
 
-The default set of JavaScript functions/identifiers in the extended parser:
+The default set of JavaScript functions/identifiers always added to the extended parser:
 
 ```js
   undefined,
@@ -42,24 +43,35 @@ The default set of JavaScript functions/identifiers in the extended parser:
   '===': (a, b) => a === b,
   '!==': (a, b) => a !== b,
   '%': (a, b) => a % b,
+  '**': (a, b) => a ** b,
+```
+
+The extra set added if `env` is not given in options:
+
+```js
   get,
   Array,
   Object,
   String,
   Number,
-  Promise,
   Date,
   Math,
-  setInterval,
-  setTimeout,
   parseInt,
   parseFloat,
   Set,
   Map,
   RegExp,
-  fetch,
   console,
   log: console.log,
+```
+
+This is also added as above, but only if `noAsync` is not set to true.
+
+```js
+  Promise,
+  setInterval,
+  setTimeout,
+  fetch,
 ```
 
 - `get` is from [lodash](https://lodash.com/docs/4.17.15#get), but the fp version is used, so the arguments have reverse order.

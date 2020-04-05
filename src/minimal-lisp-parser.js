@@ -76,11 +76,11 @@ const patchParser = ({ doLog, keepJsEval }, parser) => {
   return parser;
 };
 
-export const minimalLispParser = ({ env, envExtra = {}, doLog, keepJsEval } = {}) => {
+export const minimalLispParser = ({ env, envExtra = {}, doLog, keepJsEval, noAsync } = {}) => {
   const parser = miniMAL({
     ...initialEnv,
     ...(env || {}),
-    ...(!env ? { ...basicEnv, ...asyncEnv, ...envExtra } : {}),
+    ...(!env ? { ...basicEnv, ...(noAsync ? {} : asyncEnv), ...envExtra } : {}),
   });
   patchParser({ doLog, keepJsEval }, parser);
   return parser;
