@@ -1,9 +1,6 @@
 import joi from '@hapi/joi';
 
-const miniMALcmd = joi
-  .array()
-  .min(1)
-  .items(joi.string().required(), joi.any());
+const miniMALcmd = joi.array().min(1).items(joi.string().required(), joi.any());
 
 const miniMALBlock = joi.array().items(joi.object().unknown(), miniMALcmd);
 

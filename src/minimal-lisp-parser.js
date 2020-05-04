@@ -8,7 +8,7 @@ import fetch from 'cross-fetch';
 
 // import { createJispParser } from './jisp';
 
-export const getOrSet = vars => (path, x) => {
+export const getOrSet = (vars) => (path, x) => {
   const result = x === undefined ? get(path, vars) : get(path, set(vars, path, x));
   console.log(`[miniMAL parser].var ${path}:`, result);
   return result;
@@ -16,7 +16,7 @@ export const getOrSet = vars => (path, x) => {
 
 const initialEnv = {
   undefined,
-  typeof: a => typeof a, // renaming of miniMAL's 'type'
+  typeof: (a) => typeof a, // renaming of miniMAL's 'type'
   '>': (a, b) => a > b,
   '<=': (a, b) => a <= b,
   '>=': (a, b) => a >= b,
@@ -86,13 +86,13 @@ export const minimalLispParser = ({ env, envExtra = {}, doLog, keepJsEval, noAsy
   return parser;
 };
 
-export const withVars = (vars = {}) => parser => {
+export const withVars = (vars = {}) => (parser) => {
   parser.var = getOrSet(vars);
   // console.log('miniMAL parser:', parser);
   return parser;
 };
 
-export const withFunctional = parser => {
+export const withFunctional = (parser) => {
   R.forEachObjIndexed((func, name) => {
     // if (name !== 'default') parser[name] = func;
     if (name !== 'default') parser[`R.${name}`] = func;
@@ -106,12 +106,12 @@ export const withFunctional = parser => {
 export const functionalParserWithVars = (vars = {}, parserOptions) =>
   R.compose(withFunctional, withVars(vars), minimalLispParser)(parserOptions);
 
-export const createAsyncEvaluator = (parser, parserPatcher) => async cmd => {
+export const createAsyncEvaluator = (parser, parserPatcher) => async (cmd) => {
   if (typeof cmd === 'object' && !Array.isArray(cmd)) {
     const promiseMap = R.mapObjIndexed((val, key) => {
       if (parserPatcher) parserPatcher(parser, key);
       // const result = parser.evaluate(val);
-      return new Promise(r => r(parser.evaluate(val))).catch(err => {
+      return new Promise((r) => r(parser.evaluate(val))).catch((err) => {
         console.warn('[miniMAL block parser]', val, '->', err);
         return undefined;
       });
@@ -132,7 +132,7 @@ export const createAsyncEvaluator = (parser, parserPatcher) => async cmd => {
   }
   const result = parser.evaluate(cmd);
   if (result && typeof result.then === 'function') {
-    return result.catch(err => {
+    return result.catch((err) => {
       console.warn('[miniMAL block parser]', cmd, '->', err);
       return undefined;
     });

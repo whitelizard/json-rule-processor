@@ -29,7 +29,7 @@ const evalAst = (ast, env, exprs) => {
   }
   // Evaluate the form/ast
   if (Array.isArray(ast)) {
-    return ast.map(a => evaluate(a, env));
+    return ast.map((a) => evaluate(a, env));
   }
   if (typeof ast === 'string') {
     const val = get(env, ast);
@@ -137,8 +137,8 @@ function evaluate(ast, ctx) {
   }
 }
 
-export const createJispParser = env => {
-  const obj = Object.assign(Object.create({ ...env, constructor: createJispParser }), {
+export const createJispParser = (env) => {
+  const obj = {...Object.create({ ...env, constructor: createJispParser }), ...{
     js: eval, // eslint-disable-line
     // These could all also be interop
     '=': (a, b) => a === b,
@@ -148,21 +148,21 @@ export const createJispParser = env => {
     '*': (a, b) => a * b,
     '/': (a, b) => a / b,
     // isa: (...a) => a[0] instanceof a[1],
-    typeof: a => typeof a,
+    typeof: (a) => typeof a,
     new: (...a) => new (a[0].bind(...a))(),
     // del: (...a) => delete a[0][a[1]],
     // "list":  (...a) => a,
     // "map":   (...a) => a[1].map(x => a[0](x)),
-    throw: a => {
+    throw: (a) => {
       throw a;
     },
-    read: a => JSON.parse(a),
-  });
+    read: (a) => JSON.parse(a),
+  }};
 
   // "slurp": (...a) => require("fs").readFileSync(a[0],"utf8"),
   // "load":  (...a) => evaluate(JSON.parse(require("fs").readFileSync(a[0],"utf8")),E),
-  obj.rep = a => JSON.stringify(evaluate(JSON.parse(a), obj));
-  obj.eval = a => {
+  obj.rep = (a) => JSON.stringify(evaluate(JSON.parse(a), obj));
+  obj.eval = (a) => {
     console.log('EVAL ctx:', obj);
     return evaluate(a, obj);
   };

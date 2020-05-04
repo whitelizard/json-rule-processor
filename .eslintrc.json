@@ -1,22 +1,27 @@
 {
-  "extends": ["airbnb-base", "prettier"],
-  "plugins": ["prettier"],
+  "extends": ["airbnb-base", "prettier", "plugin:fp/recommended"],
+  "plugins": ["prettier", "fp"],
   "env": {
     "node": true,
-    "browser": true
+    "browser": true,
+    "es6": true
   },
+  "globals": { "globalThis": true },
   "rules": {
     "prettier/prettier": "error",
     "no-mixed-operators": [0],
-    "arrow-parens": [2, "as-needed"],
     "import/prefer-default-export": "off",
     "no-underscore-dangle": ["error", { "allow": ["__"] }],
     "no-return-assign": ["error", "except-parens"],
-    "no-nested-ternary": [0]
-  },
-  "parserOptions": {
-    "ecmaFeatures": {
-      "experimentalObjectRestSpread": true
-    }
+    "no-nested-ternary": [0],
+    "max-lines": ["warn", 300],
+    "max-lines-per-function": ["warn", 200],
+    "complexity": ["warn", 10],
+    "max-nested-callbacks": ["warn", 3],
+    "max-depth": ["warn", 4],
+    "max-params": ["warn", 3],
+    "fp/no-nil": [0],
+    "fp/no-unused-expression": [0],
+    "fp/no-rest-parameters": [0]
   }
 }

@@ -40,9 +40,8 @@ export const statelessLoad = async (
   const { onLoad, active = false, ttl: ttlStr = null } = conf;
   const ttl = ttlStr ? new Date(ttlStr) : addYears(100)(new Date());
   const beginState = { ...initialState, active, ttl };
-  let parser;
+  const parser = active && (customParser || functionalParserWithVars(vs, pOptions));
   if (active) {
-    parser = customParser || functionalParserWithVars(vs, pOptions);
     if (onLoad) await asyncBlockEvaluator(parser, onLoad, parserPatcher);
     else console.warn('Rule has no onLoad:', conf.id || conf.rid || conf.name || 'Noname');
   }
@@ -90,6 +89,7 @@ export const statelessLoad = async (
 };
 
 export const load = async (...a) => {
+  /* eslint-disable fp/no-let, fp/no-mutation */
   let state = {};
   const tuple = await statelessLoad(...a);
   [state] = tuple;
@@ -98,4 +98,5 @@ export const load = async (...a) => {
     [state] = runned;
     return runned[1];
   };
+  /* eslint-enable fp/no-let, fp/no-mutation */
 };
