@@ -48,7 +48,7 @@ export const statelessLoad = async (
 
   const run = async (
     state = {},
-    { reuseParser = false, parserOptions = {}, vars = {}, onExpired } = {},
+    { reuseParser = false, parserOptions = pOptions, vars = {}, onExpired } = {},
   ) => {
     // console.log('run:', id, vars, parserOptions, state);
     const [done, maybeNewState] = check(conf, state, onExpired);
