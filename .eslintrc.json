@@ -1,19 +1,35 @@
 {
-  "extends": ["airbnb-base", "prettier", "plugin:fp/recommended"],
-  "plugins": ["prettier", "fp"],
+  "parser": "babel-eslint",
+  "extends": [
+    "airbnb-base",
+    "plugin:fp/recommended",
+    "plugin:functional/external-recommended",
+    "plugin:functional/lite",
+    "plugin:promise/recommended",
+    "plugin:prettier/recommended",
+    "plugin:jest/all",
+    "prettier"
+  ],
+  "plugins": ["prettier", "functional", "fp", "promise", "jest"],
   "env": {
-    "node": true,
+    "jest/globals": true,
     "browser": true,
-    "es6": true
+    "es6": true,
+    "node": true
   },
-  "globals": { "globalThis": true },
   "rules": {
-    "prettier/prettier": "error",
     "no-mixed-operators": [0],
     "import/prefer-default-export": "off",
+    "import/no-default-export": ["error"],
     "no-underscore-dangle": ["error", { "allow": ["__"] }],
     "no-return-assign": ["error", "except-parens"],
     "no-nested-ternary": [0],
+    "no-void": [0],
+    "react/jsx-filename-extension": [0],
+    "react/jsx-props-no-spreading": [0],
+    "react/require-default-props": [0],
+    "react/prop-types": [0],
+    "react/react-in-jsx-scope": [0],
     "max-lines": ["warn", 300],
     "max-lines-per-function": ["warn", 200],
     "complexity": ["warn", 10],
@@ -22,6 +38,15 @@
     "max-params": ["warn", 3],
     "fp/no-nil": [0],
     "fp/no-unused-expression": [0],
-    "fp/no-rest-parameters": [0]
+    "fp/no-rest-parameters": [0],
+    "fp/no-let": ["warn"],
+    "fp/no-mutation": ["warn", { "exceptions": [{ "object": "error" }] }],
+    "fp/no-mutating-methods": ["warn", { "allowedObjects": ["R"] }],
+    "functional/immutable-data": [0],
+    "functional/functional-parameters": [0],
+    "functional/no-let": [0],
+    "promise/always-return": [0],
+    "promise/catch-or-return": [0],
+    "promise/param-names": [0]
   }
 }

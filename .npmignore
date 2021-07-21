@@ -1,7 +1,9 @@
 /node_modules
-/src
 /test
-.babelrc
+/coverage
+.nyc_output
+.babelrc.json
+.prettierrc.json
+.eslintrc.json
+jest.config.js
 .editorconfig
-.eslintrc
-.prettierrc

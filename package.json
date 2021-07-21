@@ -3,27 +3,33 @@
   "version": "1.2.1",
   "description": "Load and run async \"JSON-Lisp\" configurations - with triggers, conditions, actions & more",
   "main": "build/index.js",
+  "module": true,
   "scripts": {
-    "test": "tap",
+    "clean": "rimraf index.js",
+    "format": "prettier src --write && npm run prettypackagejson",
+    "prettypackagejson": "prettier-package-json --write ./package.json",
     "lint": "eslint src",
+    "test": "tap",
+    "prebuild": "npm run clean && npm run lint && npm run format && npm test",
     "build": "babel src -d build",
-    "preversion": "npm test && npm run build"
+    "preversion": "npm run build"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/whitelizard/json-rule-processor.git"
   },
   "author": "Esbjörn Blomquist",
-  "license": "MIT",
+  "license": "Hippocratic-2.1",
   "dependencies": {
-    "@hapi/joi": "^16.1.8",
-    "airbnb-js-shims": "^2.2.1",
+    "@hapi/joi": "^17.1.1",
     "cross-fetch": "^3.0.2",
     "date-fns": "^2.11.1",
     "json-transformer-js": "^4.0.0",
     "lodash": "^4.17.11",
     "minimal-lisp": "^1.0.3",
-    "ramda": "^0.27.0"
+    "ploson": "^2.0.1",
+    "ramda": "^0.27.0",
+    "xstate": "^4.23.0"
   },
   "devDependencies": {
     "@babel/cli": "^7.8.4",
@@ -32,15 +38,24 @@
     "@babel/preset-env": "^7.9.0",
     "babel-eslint": "^10.1.0",
     "babel-loader": "^8.1.0",
-    "eslint": "^6.8.0",
-    "eslint-config-airbnb-base": "^14.1.0",
-    "eslint-config-prettier": "^6.10.1",
+    "eslint": "^7.31.0",
+    "eslint-config-airbnb-base": "^14.2.1",
+    "eslint-config-prettier": "^8.3.0",
     "eslint-plugin-fp": "^2.3.0",
-    "eslint-plugin-import": "^2.20.2",
-    "eslint-plugin-node": "^11.1.0",
-    "eslint-plugin-prettier": "^3.1.2",
+    "eslint-plugin-functional": "^3.2.1",
+    "eslint-plugin-import": "^2.23.4",
+    "eslint-plugin-jest": "^24.3.6",
+    "eslint-plugin-prettier": "^3.4.0",
+    "eslint-plugin-promise": "^5.1.0",
+    "husky": "^7.0.1",
+    "jest": "^27.0.6",
     "prettier": "^2.0.4",
-    "prettier-eslint": "^9.0.1",
-    "tap": "^14.10.7"
+    "prettier-eslint": "^12.0.0",
+    "tap": "^15.0.9"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "npm run format && npm run lint"
+    }
   }
 }
