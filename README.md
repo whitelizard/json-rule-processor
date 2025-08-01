@@ -2,6 +2,8 @@
 
 Load and run async "JSON-Lisp" configurations - with triggers, conditions, actions & more.
 
+> Check out https://npmjs.org/package/ploson for a much better "json-lisp" language. Building a rule processor using that might be a better idea. (I have built such layers, so you can contact me if you're interested).
+
 This package is meant to give a ton of possibilities to what a JSON/JS configuration can do. It will turn a serializable JS object notation into a functional asynchronous programming language, optionally packaged as a "rule configuration".
 
 ## miniMAL syntax
